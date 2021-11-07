@@ -2,7 +2,6 @@
 
 import cv2
 import numpy as np
-import pandas as pd
 import os
 
 from albumentations import (HorizontalFlip, VerticalFlip, 
@@ -12,7 +11,7 @@ from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset
 from tqdm import tqdm
 
-from config import Config
+from scripts.config import Config
 
 config = Config()
 
@@ -68,8 +67,6 @@ def get_img_paths(path):
     return image_names
 
 
-
-
 class CellDataset(Dataset):
     
     def __init__(self, df):
@@ -77,7 +74,7 @@ class CellDataset(Dataset):
         self.base_path = config.TRAIN_PATH
         
         self.transforms = Compose([Resize(config.IMAGE_RESIZE[0], config.IMAGE_RESIZE[1]), 
-                                   Normalize(mean=config.RESNET_MEAN, std=config.RESNET_STD, p=1), 
+                                   Normalize(mean=config.MEAN, std=config.STD, p=1), 
                                    HorizontalFlip(p=0.5),
                                    VerticalFlip(p=0.5),
                                    ToTensorV2()])
@@ -86,13 +83,13 @@ class CellDataset(Dataset):
         self.image_ids = df.id.unique().tolist()
 
 
-    def __getitem__(self, idx, df_train):
+    def __getitem__(self, idx):
         image_id = self.image_ids[idx]
         df = self.gb.get_group(image_id)
         annotations = df['annotation'].tolist()
         image_path = os.path.join(self.base_path, image_id+".png")
         image = cv2.imread(image_path)
-        mask = build_masks(df_train, image_id, input_shape=(520, 704))
+        mask = build_masks(self.df, image_id, input_shape=(520, 704))
         mask = (mask >= 1).astype('float32')
         augmented = self.transforms(image=image, mask=mask)
         image = augmented['image']
@@ -102,4 +99,4 @@ class CellDataset(Dataset):
 
     def __len__(self):
         return len(self.image_ids)
-    
+       

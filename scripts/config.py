@@ -5,7 +5,7 @@ import torch
 import yaml
 
 class Config:
-    def __init__(self, model_name="placeholder"):
+    def __init__(self, model_name="resnet34"):
         """
         Configuration  class for all models
 

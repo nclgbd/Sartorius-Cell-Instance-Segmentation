@@ -25,6 +25,7 @@ dependencies:
     - pyyaml
     - scipy
     - seaborn
+    - segmentation-models-pytorch
     - tqdm
     - urllib3
     - wandb

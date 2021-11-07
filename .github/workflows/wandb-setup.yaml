@@ -8,9 +8,11 @@ jobs:
       - uses: conda-incubator/setup-miniconda@v2
         with:
           auto-activate-base: false
-          activate-environment: torch_base
-          environment-file: conda-envs/torch_base.yaml
-      - run: |
+          activate-environment: skc_env
+          environment-file: conda-envs/skc_env.yaml
+      - name: Check conda environment
+        shell: bash -l {0}
+        run: |
           conda info
           conda list
           conda config --show-sources

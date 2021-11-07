@@ -14,6 +14,7 @@ dependencies:
   - scikit-learn
   - torchvision
   - pip:
+    - albumentations
     - bumpversion
     - future
     - kaggle
@@ -21,8 +22,10 @@ dependencies:
     - pandas
     - python-dotenv
     - pytest
+    - pyyaml
     - scipy
     - seaborn
     - tqdm
     - urllib3
     - wandb
+    

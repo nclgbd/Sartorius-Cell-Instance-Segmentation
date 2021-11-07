@@ -1,0 +1,31 @@
+name: skc_env
+channels:
+  - pytorch
+  - defaults
+dependencies:
+  - cudatoolkit=10.2
+  - jupyter
+  - numpy
+  - opencv
+  - pillow
+  - pip
+  - python
+  - pytorch=1.7.0
+  - scikit-learn
+  - torchvision
+  - pip:
+    - albumentations
+    - bumpversion
+    - future
+    - kaggle
+    - mdutils
+    - pandas
+    - python-dotenv
+    - pytest
+    - pyyaml
+    - scipy
+    - seaborn
+    - tqdm
+    - urllib3
+    - wandb
+    

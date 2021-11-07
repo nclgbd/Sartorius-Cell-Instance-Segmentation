@@ -1,5 +1,8 @@
+
 name: Test WandB Login
+
 on: [push]
+
 jobs:
   wandb-login:
     runs-on: ubuntu-latest

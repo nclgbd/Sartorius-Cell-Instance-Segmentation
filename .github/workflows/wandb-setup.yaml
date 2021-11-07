@@ -1,0 +1,21 @@
+name: Test WandB Login
+on: [push]
+jobs:
+  wandb-login:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: conda-incubator/setup-miniconda@v2
+        with:
+          auto-activate-base: false
+          activate-environment: torch_base
+          environment-file: conda-envs/torch_base.yaml
+      - run: |
+          conda info
+          conda list
+          conda config --show-sources
+          conda config --show
+          printenv | sort
+      - name: Check wandb setup
+        shell: bash -l {0}
+        run: wandb login --anonymously

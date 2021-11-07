@@ -16,6 +16,7 @@ dependencies:
   - pip:
     - bumpversion
     - future
+    - kaggle
     - mdutils
     - pandas
     - python-dotenv

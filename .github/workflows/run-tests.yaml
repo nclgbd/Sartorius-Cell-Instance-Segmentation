@@ -16,5 +16,7 @@ jobs:
         activate-environment: skc_env
         environment-file: conda-envs/skc_env.yaml
     - name: Test with pytest
+      shell: bash -l {0}
       run: |
+        conda activate skc_env
         pytest -v

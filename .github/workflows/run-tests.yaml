@@ -32,6 +32,6 @@ jobs:
         pytest -v
     - name: Check wandb setup
       shell: bash -l {0}
-      run: 
+      run: |
         conda activate skc_env
         bash scripts/wandb_init.sh

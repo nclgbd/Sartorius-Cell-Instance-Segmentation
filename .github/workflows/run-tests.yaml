@@ -6,7 +6,7 @@ name: Run python tests
 on: [push, pull_request]
 
 jobs:
-  build:
+  test-env:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2

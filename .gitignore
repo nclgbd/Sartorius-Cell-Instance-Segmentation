@@ -4,4 +4,5 @@
 *.env
 config/kaggle.json
 data/
+wandb/
 sartorius-complete-unet-understanding.ipynb

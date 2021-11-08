@@ -34,14 +34,14 @@ jobs:
       shell: bash -l {0}
       run: |
         conda activate skc_env
-        touch scripts/.env
+        touch config/.env
 
         
-        echo 'project="Sartorius-Cell-Instance-Segmentation"' >> scripts/.env
-        echo 'entity="${{secrets.ENTITY}}"' >> scripts/.env
-        echo 'wandb_api_key=${{secrets.WANDB_API_KEY}}' >> scripts/.env
+        echo 'project="Sartorius-Cell-Instance-Segmentation"' >> config/.env
+        echo 'entity="${{secrets.ENTITY}}"' >> config/.env
+        echo 'wandb_api_key=${{secrets.WANDB_API_KEY}}' >> config/.env
 
-        echo "scripts/.env contents:"
-        cat scripts/.env
+        echo "config/.env contents:"
+        cat config/.env
         python scripts/wandb_init.py
 

@@ -21,6 +21,5 @@ jobs:
           conda config --show-sources
           conda config --show
           printenv | sort
-      - name: Check wandb setup
-        shell: bash -l {0}
-        run: wandb login --anonymously
+
+          

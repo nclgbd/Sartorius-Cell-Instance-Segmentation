@@ -39,7 +39,7 @@ jobs:
         
         echo 'project="Sartorius-Cell-Instance-Segmentation"' >> scripts/.env
         echo 'entity="${{secrets.ENTITY}}"' >> scripts/.env
-        echo 'wandb_api_key="${{secrets.WANDB_API_KEY}}"' >> scripts/.env
+        echo 'wandb_api_key=${{secrets.WANDB_API_KEY}}' >> scripts/.env
 
         echo "scripts/.env contents:"
         cat scripts/.env

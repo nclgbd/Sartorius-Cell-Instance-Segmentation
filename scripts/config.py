@@ -30,6 +30,7 @@ class Config:
         self.STD = cfg["std"]
         self.IMAGE_RESIZE = cfg["input_size"]
         self.LEARNING_RATE = cfg["eta"]
+        self.BATCH_SIZE = cfg["batch_size"]
         self.EPOCHS = 1000
         
         self.set_seed()

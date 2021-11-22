@@ -15,6 +15,31 @@ from scripts.config import Config
 
 config = Config()
 
+
+def im_convert(tensor, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+    """
+    Private function for converting an image so it can be displayed using matplotlib functions properly.
+    Parameters
+    ----------
+    `tensor`\n
+        Tensor represention of image data.
+    `mean` : `tuple` or `list`, `optional`\n
+        Mean of the data; used for de-normalization of the image, by default (0.485, 0.456, 0.406).
+    `std` : `tuple` or `list`, `optional`\n
+        Standard deviation of the data; used for de-normalaztion of the image, by default (0.229, 0.224, 0.225).
+    Returns
+    -------
+    `ndarray`\n
+        Returns ndarry de-normalizazed representation of an image.
+    """        
+    
+    image = tensor.clone().detach().numpy()
+    image = image.transpose(1, 2, 0)
+    image = image * np.array(std) + np.array(mean) # [0, 1] -> [0, 255]
+    image = image.clip(0, 1)
+    return image
+
+
 def _rle_decode(mask_rle, shape, color=1):
     '''
     mask_rle: run-length as string formated (start length)
@@ -80,7 +105,7 @@ class CellDataset(Dataset):
                                    ToTensorV2()])
         
         self.gb = self.df.groupby('id')
-        self.image_ids = df.id.unique().tolist()
+        self.image_ids = list(df.id.unique())
 
 
     def __getitem__(self, idx):

@@ -10,4 +10,5 @@ resnet34:
   input_size: [224, 224]
   eta: 0.001
   epochs: 1000
+  batch_size: 16
   

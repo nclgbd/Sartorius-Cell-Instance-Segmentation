@@ -5,7 +5,7 @@ import torch
 import yaml
 
 class Config:
-    def __init__(self, backbone="resnet34"):
+    def __init__(self, model_name, backbone="resnet34", config_path="config/params.yaml"):
         """
         Configuration  class for all models
 
@@ -15,9 +15,9 @@ class Config:
             Name of the model
         """        
         
-        with open("config/params.yaml", "r") as stream:
+        with open(config_path, "r") as stream:
             base_cfg = yaml.safe_load(stream)
-            self.cfg = base_cfg[backbone]
+            self.cfg = base_cfg[model_name][backbone]
         
         self.BACKBONE = backbone
         self.DIRECTORY_PATH = base_cfg["project_path"]

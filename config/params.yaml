@@ -4,11 +4,12 @@ test: "test"
 train_semi_supervised: "train_semi_supervised"
 seed: 42
 
-resnet34:
-  mean: [0.485, 0.456, 0.406]
-  std: [0.229, 0.224, 0.225]
-  input_size: [224, 224]
-  eta: 0.001
-  epochs: 1000
-  batch_size: 16
+unet:
+  resnet34:
+    mean: [0.485, 0.456, 0.406]
+    std: [0.229, 0.224, 0.225]
+    input_size: [224, 224]
+    eta: 0.001
+    epochs: 10
+    batch_size: 16
   

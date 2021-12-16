@@ -1,15 +1,37 @@
+import argparse
 import os
+import time
 import torch
 import wandb
+import pandas as pd
 
+from datetime import datetime
+from pprint import pprint
 from torch import nn
+from torch import optim
 from torch.utils.data import (DataLoader, 
                               Dataset)
 from tqdm import tqdm
 from statistics import (mean, 
                         stdev)
 from utils import (create_loader,
-                   make_model)
+                   make_model,
+                   CellDataset)
+
+from config import Config
+
+parser = argparse.ArgumentParser(description='Training script')
+parser.add_argument('--model_name', "-m", type=str, choices=['unet'],
+                    help='the name of the model')
+parser.add_argument('--backbone', "-b", type=str, default="resnet34", choices=['resnet34'],
+                    help='the name of the backbone. Defaults to `resnet34`')
+parser.add_argument('--params_path', "-p", type=str, default="config/params.yaml",
+                    help='The path to the parameters.yaml file. Defaults to `config/params.yaml`')
+parser.add_argument('--log', "-l", type=str, default="False",
+                    help='Boolean representing whether to log metrics to wandb or not. Defaults to `False`')
+
+args = parser.parse_args().__dict__
+
 
 def _get_kwargs(**kwargs):
     criterion = kwargs["criterion"]
@@ -81,6 +103,7 @@ def _train(model_name, dataset: Dataset, config=None, log=False, **kwargs):
     
     for idx, (train_idx, valid_idx) in dataset.folds:
         # Create loaders
+        print(f"Fold {idx+1}")
         dl_train = create_loader(dataset, train_idx)
         dl_valid = create_loader(dataset, valid_idx)
         
@@ -172,4 +195,89 @@ def train(model_name, dataset: Dataset, config=None, log=False, **kwargs):
                dataset=dataset, 
                log=log,
                kwargs=kwargs)
-        
+    
+
+def dice_loss(input, target):
+    input = torch.sigmoid(input)
+    smooth = 1.0
+    iflat = input.view(-1)
+    tflat = target.view(-1)
+    intersection = (iflat * tflat).sum()
+    return ((2.0 * intersection + smooth) / (iflat.sum() + tflat.sum() + smooth))
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma):
+        super().__init__()
+        self.gamma = gamma
+
+    def forward(self, input, target):
+        if not (target.size() == input.size()):
+            raise ValueError("Target size ({}) must be the same as input size ({})"
+                             .format(target.size(), input.size()))
+        max_val = (-input).clamp(min=0)
+        loss = input - input * target + max_val + \
+            ((-max_val).exp() + (-input - max_val).exp()).log()
+        invprobs = F.logsigmoid(-input * (target * 2.0 - 1.0))
+        loss = (invprobs * self.gamma).exp() * loss
+        return loss.mean()
+    
+    
+class MixedLoss(nn.Module):
+    def __init__(self, alpha, gamma):
+        super().__init__()
+        self.alpha = alpha
+        self.focal = FocalLoss(gamma)
+
+    def forward(self, input, target):
+        loss = self.alpha*self.focal(input, target) - torch.log(dice_loss(input, target))
+        return loss.mean()
+    
+
+if __name__ == "__main__":
+    
+    MODEL_NAME = args["model_name"]
+    CONFIG_PATH = args["params_path"]
+    LOG = args["log"] == "True"
+    BACKBONE = args["backbone"]
+    
+    print(f"\nLoading configuration from `{CONFIG_PATH}`...")
+    config = Config(model_name=MODEL_NAME,
+                    backbone=BACKBONE,
+                    config_path=CONFIG_PATH)
+    print("Loading configuration complete.\n")
+    pprint(config.cfg)
+    
+    print("\nLoading training data...")
+    df_train = pd.read_csv(config.TRAIN_CSV)
+    print("Loading training data complete.\n")
+    print(df_train.info())
+    
+    # Dataset/loader prep
+    print("\nConfiguring training...")
+    ds_train = CellDataset(df_train, config=config)
+    dl_train = DataLoader(ds_train, 
+                          batch_size=config.BATCH_SIZE, 
+                          num_workers=4, 
+                          pin_memory=True, 
+                          shuffle=False)
+    
+    model = make_model(model_name=MODEL_NAME, config=config)
+    criterion = MixedLoss(10.0, 2.0)
+    optimizer = optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
+    torch_args = {"criterion": criterion,
+                  "optimizer": optimizer}
+    
+    start = datetime.now()
+    
+    print(f"\nConfiguration setup complete. Training began at {start} ...\n")
+    train(model_name=MODEL_NAME,
+          dataset=ds_train,
+          config=config,
+          log=LOG,
+          kwargs=torch_args)
+    
+    end = datetime.now()
+    train_time = end - start
+    print(f"\nTraining complete. Total training time: {train_time}")
+    
+    

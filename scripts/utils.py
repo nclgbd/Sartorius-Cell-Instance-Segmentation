@@ -3,8 +3,7 @@
 import cv2
 import os
 import numpy as np
-import vaex as pd
-import vaex.ml as ml
+import pandas as pd
 import matplotlib.pyplot as plt
 import wandb
 import torch
@@ -19,10 +18,6 @@ from torch.utils.data import (Dataset,
                               DataLoader)
 from tqdm import tqdm
 from sklearn.model_selection import StratifiedKFold
-
-from scripts.config import Config
-
-config = Config()
 
 CLASS_MAPPING = {
     0: 'shsy5y',
@@ -142,7 +137,7 @@ def get_img_paths(path):
     return image_names
 
 
-def plot_masks(image_id, df_train, config, colors=True):
+def plot_masks(image_id, df_train, config=None, colors=True):
     labels = df_train[df_train["id"] == image_id]["annotation"].tolist()
     cell_type = df_train[df_train["id"] == image_id]["cell_type"].tolist()
     cmap = {"shsy5y": (0,0,255),
@@ -194,7 +189,7 @@ def wandb_mask(bg_img, gt_mask):
 
 class CellDataset(Dataset):
     
-    def __init__(self, df):
+    def __init__(self, df, config=None):
         self.df = df
         self.base_path = config.TRAIN_PATH
         
@@ -207,6 +202,7 @@ class CellDataset(Dataset):
         self.gb = self.df.groupby('id')
         self.image_ids = list(df.id.unique())
         self.folds = self._split_data()
+        self.config = config
 
 
     def __getitem__(self, idx):
@@ -222,7 +218,7 @@ class CellDataset(Dataset):
         augmented = self.transforms(image=image, mask=mask)
         image = augmented['image']
         mask = augmented['mask']
-        return image, mask.reshape((1, config.IMAGE_RESIZE[0], config.IMAGE_RESIZE[1]))
+        return image, mask.reshape((1, self.config.IMAGE_RESIZE[0], self.config.IMAGE_RESIZE[1]))
 
 
     def __len__(self):
@@ -232,21 +228,21 @@ class CellDataset(Dataset):
     def _split_data(self, n_splits=5):
         # creates folds
         
-        X = [os.path.join(config.TRAIN_PATH, image_id+".png") for image_id in self.image_ids]
+        X = [os.path.join(self.base_path, image_id+".png") for image_id in self.image_ids]
+        X = np.array(X)
         # X = df_train["images"]
         y = [build_masks(self.df, image_id, input_shape=(520, 704)) for image_id in self.image_ids]
+        y = np.array(y)
         # mask = (mask >= 1).astype('float32')
-        print(X)
         
-        print(y)
-        
-        self.df["image_paths"] = X
-        print(self.df)
+        # self.df["image_paths"] = X
+        print("X shape:", X.shape)
+        print("y shape:", y.shape)
         
         # X_train, X_valid = X.iloc[train_idx], X.iloc[valid_idx]
         # y_train, y_valid = y.iloc[train_idx], y.iloc[valid_idx]
         
-        folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y)
+        folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y[:-2])
         
         # ds_train = CellDataset(df_train)
         # dl_train = DataLoader(

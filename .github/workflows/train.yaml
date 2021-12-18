@@ -3,7 +3,11 @@
 
 name: Run python tests
 
-on: [push, pull_request]
+on: 
+  push:
+    branches:
+      - train-*
+      - develop-train
 
 jobs:
   test-env:
@@ -34,5 +38,5 @@ jobs:
         conda activate skc_env
         bash scripts/wandbinit.sh
 
-        python scripts/train.py --model_name=unet --log=True
+        python scripts/train.py --model_name=unet --log=True --params_path=config/test_params.yaml
 

@@ -36,13 +36,21 @@ jobs:
       shell: bash -l {0}
       run: |
         touch config/.env
-        
+
         echo 'project="Sartorius-Cell-Instance-Segmentation"' >> config/.env
         echo 'entity="${{secrets.ENTITY}}"' >> config/.env
         echo 'wandb_api_key=${{secrets.WANDB_API_KEY}}' >> config/.env
 
         echo "config/.env contents:"
         cat config/.env
+    - name: Download dataset
+      shell: bash -l {0}
+      run: |
+        touch ~/.kaggle/kaggle.json
+        export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
+        export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
+        kaggle competitions download -c sartorius-cell-instance-segmentation
+        unzip sartorius-cell-instance-segmentation.zip data/
     - name: Train
       shell: bash -l {0}
       run: |

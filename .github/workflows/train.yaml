@@ -23,18 +23,16 @@ jobs:
         conda config --show-sources
         conda config --show
         printenv | sort
-    - name: Test with pytest
+    - name: Export `PYTHONPATH`
       shell: bash -l {0}
       run: |
         pwd
         export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-        conda activate skc_env
-        pytest -v
     - name: Check wandb setup
       shell: bash -l {0}
       run: |
         conda activate skc_env
         bash scripts/wandbinit.sh
-        
-        python scripts/wandb_init.py
+
+        python scripts/train.py --model_name=unet --log=True
 

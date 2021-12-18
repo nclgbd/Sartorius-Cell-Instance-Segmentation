@@ -34,10 +34,12 @@ jobs:
         export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
         printenv | sort
 
+        echo "Copying `sartorius-cell-instance-segmentation.zip` to current directory..."
         conda activate skc_env
         cp ~/datasets/sartorius-cell-instance-segmentation.zip .
-        unzip sartorius-cell-instance-segmentation.zip -d data
+        unzip -o -q sartorius-cell-instance-segmentation.zip -d data
         ls -la data/
+        echo "Moving data complete. Exit code $(echo $?)"
     - name: Train
       shell: bash -l {0}
       run: |

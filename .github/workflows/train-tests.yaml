@@ -17,9 +17,7 @@ jobs:
       shell: bash -l {0}
       run: |
         conda info
-        conda list
-        conda config --show-sources
-        conda config --show
+        conda env list
         printenv | sort
     - name: Wandb setup
       shell: bash -l {0}
@@ -33,7 +31,11 @@ jobs:
       run: |
         export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
         export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
+        conda config --show-sources
+        conda config --show
+
         kaggle competitions download -c sartorius-cell-instance-segmentation
+        ls -la
         unzip sartorius-cell-instance-segmentation.zip data/
     - name: Train
       shell: bash -l {0}

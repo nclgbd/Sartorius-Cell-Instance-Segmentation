@@ -33,12 +33,9 @@ jobs:
         export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
         export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
         printenv | sort
-        # echo '{"username": "${{ secrets.KAGGLE_USERNAME }}","key": "${{ secrets.KAGGLE_API_KEY }}"}' > ~/.kaggle/kaggle.json
-        # echo '{"username": "nguobadia","key": "988e756880040385c3c7cfcdccb4b280"}' > ~/.kaggle/kaggle.json
 
         conda activate skc_env
-        kaggle competitions download -c sartorius-cell-instance-segmentation
-        ls -la
+        cp ~/datasets/sartorius-cell-instance-segmentation.zip .
         unzip sartorius-cell-instance-segmentation.zip -d data
         ls -la data/
     - name: Train

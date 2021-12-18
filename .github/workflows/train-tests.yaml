@@ -13,11 +13,6 @@ jobs:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v2
-    - uses: conda-incubator/setup-miniconda@v2
-      with:
-        auto-activate-base: false
-        activate-environment: skc_env
-        environment-file: conda-envs/skc_env.yaml
     - name: Check conda environment
       shell: bash -l {0}
       run: |
@@ -26,26 +21,16 @@ jobs:
         conda config --show-sources
         conda config --show
         printenv | sort
-    - name: Export `PYTHONPATH`
-      shell: bash -l {0}
-      run: |
-        pwd
-        export PYTHONPATH="${PYTHONPATH}:$(pwd)"
     - name: Wandb setup
       shell: bash -l {0}
       run: |
-        touch config/.env
-
-        echo 'project="Sartorius-Cell-Instance-Segmentation"' >> config/.env
-        echo 'entity="${{secrets.ENTITY}}"' >> config/.env
-        echo 'wandb_api_key=${{secrets.WANDB_API_KEY}}' >> config/.env
-
-        echo "config/.env contents:"
-        cat config/.env
+        # touch config/.env
+        export WANDB_ENTITY=${{ secrets.ENTITY }}
+        export WANDB_PROJECT=Sartorius-Cell-Instance-Segmentation
+        export WANDB_API_KEY=${{ secrets.WANDB_API_KEY }}
     - name: Download dataset
       shell: bash -l {0}
       run: |
-        # touch ~/.kaggle/kaggle.json
         export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
         export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
         kaggle competitions download -c sartorius-cell-instance-segmentation

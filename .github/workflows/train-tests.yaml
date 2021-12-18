@@ -34,6 +34,7 @@ jobs:
         export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
         printenv | sort
 
+        conda activate skc_env
         kaggle competitions download -c sartorius-cell-instance-segmentation
         ls -la
         unzip sartorius-cell-instance-segmentation.zip data/

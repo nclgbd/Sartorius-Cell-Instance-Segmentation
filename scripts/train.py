@@ -6,6 +6,7 @@ import wandb
 import pandas as pd
 
 from datetime import datetime
+from dotenv import dotenv_values
 from pprint import pprint
 from torch import nn
 from torch import optim
@@ -27,8 +28,8 @@ parser.add_argument('--backbone', "-b", type=str, default="resnet34", choices=['
                     help='the name of the backbone. Defaults to `resnet34`')
 parser.add_argument('--params_path', "-p", type=str, default="config/params.yaml",
                     help='The path to the parameters.yaml file. Defaults to `config/params.yaml`')
-parser.add_argument('--log', "-l", type=str, default="False",
-                    help='Boolean representing whether to log metrics to wandb or not. Defaults to `False`')
+parser.add_argument('--log', "-l", type=str, default="True",
+                    help='Boolean representing whether to log metrics to wandb or not. Defaults to `True`')
 
 args = parser.parse_args().__dict__
 
@@ -173,7 +174,8 @@ def _train(model_name, dataset: Dataset, config=None, log=False, **kwargs):
 def train(model_name, dataset: Dataset, config=None, log=False, **kwargs):
     # wandb implementation
     if log:
-        os.environ['WANDB_API_KEY'] = config["wandb_api_key"]
+        with open("config/.env", "r") as conf:
+            os.environ['WANDB_API_KEY'] = dotenv_values(conf)["wandb_api_key"]
         
         run = wandb.init(project=config["project"], 
                         entity=config["entity"], 

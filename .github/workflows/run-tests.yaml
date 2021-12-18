@@ -30,12 +30,10 @@ jobs:
         export PYTHONPATH="${PYTHONPATH}:$(pwd)"
         conda activate skc_env
         pytest -v
-    - name: Check wandb setup
+    - name: Wandb setup
       shell: bash -l {0}
       run: |
-        conda activate skc_env
         touch config/.env
-
         
         echo 'project="Sartorius-Cell-Instance-Segmentation"' >> config/.env
         echo 'entity="${{secrets.ENTITY}}"' >> config/.env
@@ -43,5 +41,6 @@ jobs:
 
         echo "config/.env contents:"
         cat config/.env
+        
         python scripts/wandb_init.py
 

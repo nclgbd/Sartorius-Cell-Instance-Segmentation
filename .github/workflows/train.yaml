@@ -1,7 +1,7 @@
 # This workflow runs tests
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-name: Train
+name: Test train
 
 on: 
   push:
@@ -10,7 +10,7 @@ on:
       - develop-train
 
 jobs:
-  test-env:
+  train:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
@@ -32,11 +32,19 @@ jobs:
       run: |
         pwd
         export PYTHONPATH="${PYTHONPATH}:$(pwd)"
-    - name: Check wandb setup
+    - name: Wandb setup
+      shell: bash -l {0}
+      run: |
+        touch config/.env
+        
+        echo 'project="Sartorius-Cell-Instance-Segmentation"' >> config/.env
+        echo 'entity="${{secrets.ENTITY}}"' >> config/.env
+        echo 'wandb_api_key=${{secrets.WANDB_API_KEY}}' >> config/.env
+
+        echo "config/.env contents:"
+        cat config/.env
+    - name: Train
       shell: bash -l {0}
       run: |
         conda activate skc_env
-        bash scripts/wandbinit.sh
-
         python scripts/train.py --model_name=unet --log=True --params_path=config/test_params.yaml
-

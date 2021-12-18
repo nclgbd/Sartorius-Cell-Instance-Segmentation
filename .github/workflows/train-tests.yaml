@@ -6,7 +6,6 @@ name: Test train
 on: 
   push:
     branches:
-      - train-*
       - develop-train
 
 jobs:
@@ -46,7 +45,7 @@ jobs:
     - name: Download dataset
       shell: bash -l {0}
       run: |
-        touch ~/.kaggle/kaggle.json
+        # touch ~/.kaggle/kaggle.json
         export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
         export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
         kaggle competitions download -c sartorius-cell-instance-segmentation

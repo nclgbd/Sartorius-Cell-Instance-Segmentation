@@ -26,6 +26,7 @@ class Config:
         self.TEST_PATH = os.path.join(self.DIRECTORY_PATH, base_cfg["test"])
         self.TRAIN_SEMI_SUPERVISED_PATH = os.path.join(self.DIRECTORY_PATH, base_cfg["train_semi_supervised"])
         self.SEED = base_cfg["seed"]
+        self.MODEL_PATH = base_cfg["model_path"]
         
         self.MEAN = self.cfg["mean"]
         self.STD = self.cfg["std"]

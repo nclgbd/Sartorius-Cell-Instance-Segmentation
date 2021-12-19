@@ -42,5 +42,6 @@ jobs:
         echo "config/.env contents:"
         cat config/.env
         
+        mkdir "models"
         python scripts/wandb_init.py
 

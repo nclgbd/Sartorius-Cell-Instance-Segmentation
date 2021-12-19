@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import wandb
 import torch
 import segmentation_models_pytorch as smp
+from torch import nn
 
 from albumentations import (HorizontalFlip, VerticalFlip, 
                             ShiftScaleRotate, Normalize, Resize, 
@@ -186,7 +187,6 @@ def wandb_mask(bg_img, gt_mask):
   )
 
 
-
 class CellDataset(Dataset):
     
     def __init__(self, df, config=None):
@@ -233,25 +233,101 @@ class CellDataset(Dataset):
         # X = df_train["images"]
         y = [build_masks(self.df, image_id, input_shape=(520, 704)) for image_id in self.image_ids]
         y = np.array(y)
+        yn, nh, nw = y.shape
+        y = y.reshape((yn, nh * nw))
         # mask = (mask >= 1).astype('float32')
         
         # self.df["image_paths"] = X
         print("X shape:", X.shape)
         print("y shape:", y.shape)
         
-        # X_train, X_valid = X.iloc[train_idx], X.iloc[valid_idx]
-        # y_train, y_valid = y.iloc[train_idx], y.iloc[valid_idx]
-        
-        folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y[:-2])
-        
-        # ds_train = CellDataset(df_train)
-        # dl_train = DataLoader(
-        #     ds_train, 
-        #     batch_size=config.BATCH_SIZE, 
-        #     num_workers=4, 
-        #     pin_memory=True, 
-        #     shuffle=False
-        # )
+        folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y.argmax(1))
         
         return folds
        
+class EarlyStopping():
+    
+    def __init__(self, 
+                 model_dir:str, 
+                 model_name:str, 
+                 min_delta=0,
+                 patience=5,
+                 run=None):
+        """
+        Class for early stopping, because only plebs rely on set amounts of epochs.
+        
+        Attributes
+        ----------
+        `TODO`
+        Parameters
+        ----------
+        `model_name` : `str`\n
+            Model name.
+        `fold` : `int`\n
+            Number representing the current fold.
+        `min_delta` : `int`, `optional`\n
+            Smallest number the given metric needs to change in order to count as progress, by default 0.
+        """        
+        
+        self.min_loss = float('inf')
+        self.max_iou = -float('inf')
+        self.min_delta = min_delta
+        self.model_name = model_name 
+        self.patience = patience
+        self.count = 0
+        self.first_run = True
+        self.best_model = None
+        self.artifact: wandb.Artifact
+        self.run = run
+        self.fname = "".join([self.model_name, f"-{run.id}", '.pth']) if run else self.model_name+'.pth'
+        self.path = str(os.path.join(model_dir, self.fname))
+        
+        
+    def checkpoint(self, model:nn.Module, epoch:int, loss:float, iou:float, optimizer, log=True):
+        """
+        Creates the checkpoint and keeps track of when we should stop training. You can choose whether or not you'd like to save the model based on the `dry_run` parameter.
+        
+        Parameters
+        ----------
+        `model` : `nn.Module`\n
+            The model to be saved.
+        `epoch` : `int`\n
+            Number representing the current epoch.
+        `loss` : `float`\n
+            Current loss.
+        `iou` : `float`\n
+            Current IoU.
+        `optimizer`
+            The optimization function currently in use.
+        `dry_run` : `bool`, `optional`\n
+            Boolean representing whether we're training to evaluate hyperparameter tuning or training the model for comel comparisons, by default True.
+        Returns
+        -------
+        `int`\n
+            Returns a number representing the current level of patience reached.
+        """        
+        
+        print(f'Loss to beat: {(self.min_loss - self.min_delta):.4f}')
+        if (self.min_loss - self.min_delta) > loss or self.first_run:
+            self.first_run = False
+            self.min_loss = loss
+            self.max_iou = iou
+            self.best_model = model
+            self.count = 0
+            if log:
+                state_dict = {'epoch': epoch,
+                            'model_state_dict': model.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            'loss': self.min_loss,
+                            'iou': self.max_iou}
+                torch.save(state_dict, self.path)
+                
+                self.artifact = wandb.Artifact('unet', type='model')
+                self.artifact.add_dir(self.path)
+                self.run.log_artifact(self.artifact)
+                
+            
+        else:
+            self.count += 1
+            
+        return self.count

@@ -43,5 +43,6 @@ jobs:
     - name: Train
       shell: bash -l {0}
       run: |
+        mkdir "models"
         conda activate skc_env
         python scripts/train.py --model_name=unet --log=True --params_path=config/test_params.yaml

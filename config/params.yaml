@@ -1,6 +1,7 @@
 project_path: "data"
 train: "train"
 test: "test"
+model_path: "models"
 train_semi_supervised: "train_semi_supervised"
 seed: 42
 

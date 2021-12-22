@@ -112,7 +112,7 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, **kwa
         print(f"Fold {idx+1}\n")
         dataset.dl_train = create_loader(dataset, train_idx, config=config)
         dataset.dl_valid = create_loader(dataset, valid_idx, config=config)
-        
+        es_counter = 0
         for epoch in range(1, config.EPOCHS + 1):
             print(f"Epoch: {epoch}")
             # Train and get metrics back
@@ -146,7 +146,8 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, **kwa
                                                        optimizer=optimizer)
                 
                 print(f"Patience currently: {es_counter}")
-                if es_counter == early_stopping.patience:
+                if es_counter >= early_stopping.patience:
+                    es_counter = 0
                     break
         
     # Print all training and validation metrics    
@@ -232,7 +233,8 @@ def _skf_train(model_name, dataset: Dataset, config=None, log=False, run=None, *
                                                        optimizer=optimizer)
                 
                 print(f"Patience currently: {es_counter}")
-                if es_counter == early_stopping.patience:
+                if es_counter >= early_stopping.patience:
+                    es_counter = 0
                     break
         
     # Print all training and validation metrics    

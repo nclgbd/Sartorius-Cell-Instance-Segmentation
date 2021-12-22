@@ -323,7 +323,6 @@ class EarlyStopping():
             self.min_loss = loss
             self.max_iou = iou
             self.best_model = model
-            self.count = 0
             if log:
                 state_dict = {'epoch': epoch,
                             'model_state_dict': model.state_dict(),
@@ -335,6 +334,8 @@ class EarlyStopping():
                 self.artifact = wandb.Artifact('unet', type='model')
                 self.artifact.add_file(self.path)
                 self.run.log_artifact(self.artifact)
+                
+            self.count = 0
                 
             
         else:

@@ -27,6 +27,8 @@ class Config:
         self.TRAIN_SEMI_SUPERVISED_PATH = os.path.join(self.DIRECTORY_PATH, base_cfg["train_semi_supervised"])
         self.SEED = base_cfg["seed"]
         self.MODEL_PATH = base_cfg["model_path"]
+        self.KFOLD = base_cfg["kfold"]
+        self.N_SPLITS = base_cfg["n_splits"]
         
         self.MEAN = self.cfg["mean"]
         self.STD = self.cfg["std"]

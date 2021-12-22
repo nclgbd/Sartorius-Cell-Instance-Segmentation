@@ -4,6 +4,8 @@ test: "test"
 model_path: "models"
 train_semi_supervised: "train_semi_supervised"
 seed: 42
+kfold: false
+n_splits: 5
 
 unet:
   resnet34:

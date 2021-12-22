@@ -7,14 +7,11 @@ from pprint import pprint
 from torch import optim
 from torch.utils.data import DataLoader
 
-from .config import Config
-from .utils import CellDataset
-from .Training import (make_model,
+from config import Config
+from utils import CellDataset
+from Training import (make_model,
                        MixedLoss,
                        train)
-
-
-
 
 parser = argparse.ArgumentParser(description='Training script')
 parser.add_argument('--model_name', "-m", type=str, choices=['unet'],

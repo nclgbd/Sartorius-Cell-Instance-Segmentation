@@ -18,7 +18,7 @@ from torch.utils.data import (Dataset,
                               Subset, 
                               DataLoader)
 from tqdm import tqdm
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 
 CLASS_MAPPING = {
     0: 'shsy5y',
@@ -34,12 +34,12 @@ def make_model(model_name="unet", config=None):
         return smp.Unet(config.BACKBONE, encoder_weights="imagenet", activation=None)
     
 
-def create_loader(dataset: Dataset, idx, config=None):
+def create_loader(dataset: Dataset, idx, config=None, shuffle=False):
     loader = DataLoader(torch.utils.data.Subset(dataset, idx),
                         batch_size=config.BATCH_SIZE, 
                         num_workers=4, 
                         pin_memory=True, 
-                        shuffle=False)
+                        shuffle=shuffle)
     
     return loader
   
@@ -189,7 +189,8 @@ def wandb_mask(bg_img, gt_mask):
 
 class CellDataset(Dataset):
     
-    def __init__(self, df, config=None):
+    def __init__(self, df: pd.DataFrame, config=None):
+        self.config = config
         self.df = df
         self.base_path = config.TRAIN_PATH
         
@@ -201,8 +202,10 @@ class CellDataset(Dataset):
         
         self.gb = self.df.groupby('id')
         self.image_ids = list(df.id.unique())
-        self.folds = self._split_data()
-        self.config = config
+        self.folds = self._split_data(n_splits=config.N_SPLITS)
+
+        self.dl_train: DataLoader
+        self.dl_valid: DataLoader
 
 
     def __getitem__(self, idx):
@@ -210,7 +213,6 @@ class CellDataset(Dataset):
         df = self.gb.get_group(image_id)
         annotations = df['annotation'].tolist()
         img_path = os.path.join(self.base_path, image_id+".png")
-        print(img_path)
         # img_path = df["img_path"].loc[image_id]
         image = cv2.imread(img_path)
         mask = build_masks(self.df, image_id, input_shape=(520, 704))
@@ -227,6 +229,7 @@ class CellDataset(Dataset):
     
     def _split_data(self, n_splits=5):
         # creates folds
+        n_splits = self.config.N_SPLITS if self.config else n_splits
         
         X = [os.path.join(self.base_path, image_id+".png") for image_id in self.image_ids]
         X = np.array(X)
@@ -241,9 +244,16 @@ class CellDataset(Dataset):
         print("X shape:", X.shape)
         print("y shape:", y.shape)
         
-        folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y.argmax(1))
+        if self.config.KFOLD:
+            folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y.argmax(1))
+            return list(folds)
         
-        return folds
+        else:
+            test_size = 1.0/n_splits
+            return train_test_split(X, y.argmax(1), 
+                                    test_size=test_size, 
+                                    random_state=self.config.SEED)
+            
        
 class EarlyStopping():
     
@@ -323,7 +333,7 @@ class EarlyStopping():
                 torch.save(state_dict, self.path)
                 
                 self.artifact = wandb.Artifact('unet', type='model')
-                self.artifact.add_dir(self.path)
+                self.artifact.add_file(self.path)
                 self.run.log_artifact(self.artifact)
                 
             

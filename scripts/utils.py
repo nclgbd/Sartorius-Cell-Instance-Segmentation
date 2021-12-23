@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 import wandb
 import torch
 import segmentation_models_pytorch as smp
+
+from pprint import pprint
 from torch import nn
 
 from albumentations import (HorizontalFlip, VerticalFlip, 
@@ -18,7 +20,7 @@ from torch.utils.data import (Dataset,
                               Subset, 
                               DataLoader)
 from tqdm import tqdm
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, train_test_split
 
 CLASS_MAPPING = {
     0: 'shsy5y',
@@ -31,15 +33,17 @@ CLASS_MAPPING_ID = {v:k for k, v in CLASS_MAPPING.items()}
 
 def make_model(model_name="unet", config=None):
     if model_name == "unet":
-        return smp.Unet(config.BACKBONE, encoder_weights="imagenet", activation=None)
+        model = smp.Unet(config.BACKBONE, encoder_weights="imagenet", activation=None)
+        # pprint(model)
+        return model
     
 
-def create_loader(dataset: Dataset, idx, config=None):
+def create_loader(dataset: Dataset, idx, config=None, shuffle=False):
     loader = DataLoader(torch.utils.data.Subset(dataset, idx),
                         batch_size=config.BATCH_SIZE, 
                         num_workers=4, 
                         pin_memory=True, 
-                        shuffle=False)
+                        shuffle=shuffle)
     
     return loader
   
@@ -189,7 +193,8 @@ def wandb_mask(bg_img, gt_mask):
 
 class CellDataset(Dataset):
     
-    def __init__(self, df, config=None):
+    def __init__(self, df: pd.DataFrame, config=None):
+        self.config = config
         self.df = df
         self.base_path = config.TRAIN_PATH
         
@@ -201,8 +206,10 @@ class CellDataset(Dataset):
         
         self.gb = self.df.groupby('id')
         self.image_ids = list(df.id.unique())
-        self.folds = self._split_data()
-        self.config = config
+        self.folds = self._split_data(n_splits=config.N_SPLITS)
+
+        self.dl_train: DataLoader
+        self.dl_valid: DataLoader
 
 
     def __getitem__(self, idx):
@@ -210,7 +217,6 @@ class CellDataset(Dataset):
         df = self.gb.get_group(image_id)
         annotations = df['annotation'].tolist()
         img_path = os.path.join(self.base_path, image_id+".png")
-        print(img_path)
         # img_path = df["img_path"].loc[image_id]
         image = cv2.imread(img_path)
         mask = build_masks(self.df, image_id, input_shape=(520, 704))
@@ -227,6 +233,7 @@ class CellDataset(Dataset):
     
     def _split_data(self, n_splits=5):
         # creates folds
+        n_splits = self.config.N_SPLITS if self.config else n_splits
         
         X = [os.path.join(self.base_path, image_id+".png") for image_id in self.image_ids]
         X = np.array(X)
@@ -238,12 +245,17 @@ class CellDataset(Dataset):
         # mask = (mask >= 1).astype('float32')
         
         # self.df["image_paths"] = X
-        print("X shape:", X.shape)
-        print("y shape:", y.shape)
         
-        folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y.argmax(1))
+        if self.config.KFOLD:
+            folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y.argmax(1))
+            return list(folds)
         
-        return folds
+        else:
+            test_size = 1.0/n_splits
+            return train_test_split(X, y.argmax(1), 
+                                    test_size=test_size, 
+                                    random_state=self.config.SEED)
+            
        
 class EarlyStopping():
     
@@ -283,9 +295,9 @@ class EarlyStopping():
         self.path = str(os.path.join(model_dir, self.fname))
         
         
-    def checkpoint(self, model:nn.Module, epoch:int, loss:float, iou:float, optimizer, log=True):
+    def checkpoint(self, model:nn.Module, epoch:int, loss:float, iou:float, optimizer, log=False, checkpoint=True):
         """
-        Creates the checkpoint and keeps track of when we should stop training. You can choose whether or not you'd like to save the model based on the `dry_run` parameter.
+        Creates the checkpoint and keeps track of when we should stop training. 
         
         Parameters
         ----------
@@ -299,8 +311,8 @@ class EarlyStopping():
             Current IoU.
         `optimizer`
             The optimization function currently in use.
-        `dry_run` : `bool`, `optional`\n
-            Boolean representing whether we're training to evaluate hyperparameter tuning or training the model for comel comparisons, by default True.
+        `log` : `bool`, `optional`\n
+            Boolean representing whether we're saving logging information to wandb, by default True.
         Returns
         -------
         `int`\n
@@ -308,26 +320,30 @@ class EarlyStopping():
         """        
         
         print(f'Loss to beat: {(self.min_loss - self.min_delta):.4f}')
-        if (self.min_loss - self.min_delta) > loss or self.first_run:
+        if (self.min_loss - self.min_delta) > loss or self.first_run:                
+            self.count = 0
             self.first_run = False
             self.min_loss = loss
             self.max_iou = iou
             self.best_model = model
-            self.count = 0
-            if log:
-                state_dict = {'epoch': epoch,
-                            'model_state_dict': model.state_dict(),
-                            'optimizer_state_dict': optimizer.state_dict(),
-                            'loss': self.min_loss,
-                            'iou': self.max_iou}
-                torch.save(state_dict, self.path)
+            self.state_dict = {'epoch': epoch,
+                               'model_state_dict': model.state_dict(),
+                               'optimizer_state_dict': optimizer.state_dict(),
+                               'loss': self.min_loss,
+                               'iou': self.max_iou}
+            if checkpoint:
+                torch.save(self.state_dict, self.path)
                 
-                self.artifact = wandb.Artifact('unet', type='model')
-                self.artifact.add_dir(self.path)
-                self.run.log_artifact(self.artifact)
-                
-            
+                if log:
+                    self.artifact = wandb.Artifact('unet', type='model')
+                    self.artifact.add_file(self.path)
+                    self.run.log_artifact(self.artifact)
+
         else:
             self.count += 1
             
-        return self.count
+        return self.check_patience()
+
+    def check_patience(self):
+        print(f"Patience: {self.count}/{self.patience}" )
+        return self.count >= self.patience

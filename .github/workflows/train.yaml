@@ -1,0 +1,49 @@
+# This workflow runs tests
+# For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
+
+name: Train all models
+
+on: 
+  push:
+    branches:
+      - train*
+
+jobs:
+  train:
+    runs-on: self-hosted
+    steps:
+    - uses: actions/checkout@v2
+    - name: Check conda environment
+      shell: bash -l {0}
+      run: |
+        conda info
+        conda env list
+        conda config --show-sources
+        conda config --show
+    - name: Wandb setup
+      shell: bash -l {0}
+      run: |
+        touch config/.env
+
+        echo entity=${{ secrets.ENTITY }} >> config/.env
+        echo project=Sartorius-Cell-Instance-Segmentation >> config/.env
+        echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
+    - name: Copying dataset
+      shell: bash -l {0}
+      run: |
+        export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
+        export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
+        printenv | sort
+
+        echo "Copying `sartorius-cell-instance-segmentation.zip` to current directory..."
+        conda activate skc_env
+        cp ~/datasets/sartorius-cell-instance-segmentation.zip .
+        unzip -o -q sartorius-cell-instance-segmentation.zip -d data
+        ls -la data/
+        echo "Moving data complete. Exit code $(echo $?)"
+    - name: Train
+      shell: bash -l {0}
+      run: |
+        mkdir "models"
+        conda activate skc_env
+        python scripts/train.py --model_name=unet --log=True --params_path=config/params.yaml --checkpoint=True

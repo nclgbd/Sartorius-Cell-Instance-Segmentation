@@ -93,8 +93,11 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
 def _train(model_name, dataset: Dataset, config=None, log=False, run=None, device="cuda", checkpoint=True, **kwargs):
 
     
-    total_train_ious = total_train_losses = []
-    total_valid_ious = total_valid_losses = []
+    total_train_ious = []
+    total_train_losses = []
+    total_valid_ious = []
+    total_valid_losses = []
+    
     kwargs = kwargs["kwargs"]
     criterion = kwargs["loss"]
     optimizer = kwargs["optimizer"]
@@ -134,13 +137,13 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
             print()
             train_logs = train_epoch.run(dataset.dl_train)
             pprint({"train_logs": train_logs})
-            train_epoch_loss = train_logs['dice_loss']
+            train_epoch_loss = train_logs['loss']
             train_epoch_iou = train_logs['iou_score']
             
             print()
             valid_logs = valid_epoch.run(dataset.dl_valid)
             pprint({"valid_logs": valid_logs})
-            valid_epoch_loss = valid_logs['dice_loss']
+            valid_epoch_loss = valid_logs['loss']
             valid_epoch_iou = valid_logs['iou_score']
             
             if log:
@@ -180,10 +183,10 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
     valid_avg_loss = mean(total_valid_losses)
     valid_avg_loss_std = stdev(total_valid_losses)
     
-    print(f"Average training IoU of all folds:\t{train_avg_iou:.4f} +/- {train_avg_iou_std:.4f}")
-    print(f"Average validation IoU of all folds:\t{valid_avg_iou:.4f} +/- {valid_avg_iou_std:.4f}\n")
-    
+    print(f"Average training iou of all folds:\t{train_avg_iou:.4f} +/- {train_avg_iou_std:.4f}")    
     print(f"Average training loss of all folds:\t{train_avg_loss:.4f} +/- {train_avg_loss_std:.4f}")
+    
+    print(f"Average validation iou of all folds:\t{valid_avg_iou:.4f} +/- {valid_avg_iou_std:.4f}")
     print(f"Average validation loss of all folds:\t{valid_avg_loss:.4f} +/- {valid_avg_loss_std:.4f}")
     
     # Log the metrics if using wanb
@@ -264,6 +267,7 @@ class MixedLoss(nn.Module):
         super().__init__()
         self.alpha = alpha
         self.focal = FocalLoss(gamma)
+        self.__name__ = "mixed_loss"
 
     def forward(self, input, target):
         loss = self.alpha*self.focal(input, target) - torch.log(dice_loss(input, target))

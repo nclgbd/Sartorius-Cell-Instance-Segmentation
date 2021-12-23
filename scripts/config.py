@@ -72,9 +72,12 @@ class Config:
             k_params = self.model_cfg[k]
             if "loss" == k:
                 if "dice_loss" in keys:
-                    hyperparams["loss"] = smp.utils.losses.DiceLoss(**k_params["dice_loss"])
+                    loss = smp.utils.losses.DiceLoss(**k_params["dice_loss"])
                 elif "mixed_loss" in keys:
-                    hyperparams["loss"] = MixedLoss(**k_params["dice_loss"])
+                    loss = MixedLoss(**k_params["mixed_loss"])
+                    
+                loss.__name__ = "loss"
+                hyperparams["loss"] = loss
                     
             if "optimizer" == k:
                 if "adam" in keys:

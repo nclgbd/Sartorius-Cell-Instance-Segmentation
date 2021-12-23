@@ -28,6 +28,8 @@ jobs:
         echo entity=${{ secrets.ENTITY }} >> config/.env
         echo project=Sartorius-Cell-Instance-Segmentation >> config/.env
         echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
+
+        cat config/.env
     - name: Copying dataset
       shell: bash -l {0}
       run: |

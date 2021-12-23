@@ -9,7 +9,7 @@ on:
       - develop-train
 
 jobs:
-  train:
+  test-train:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v2

@@ -64,7 +64,7 @@ if __name__ == "__main__":
     print("\nCreating model complete.")
     
     print("\nConfiguring hyperparameters...")
-    hyperparams = config.configure_hyperparameters(keys=set(["iou", "dice_loss", "adam"]), 
+    hyperparams = config.configure_hyperparameters(keys=set(["iou", "mixed_loss", "adam"]), 
                                                    model=model)
     print("\nConfiguring hyperparameters complete.")
     

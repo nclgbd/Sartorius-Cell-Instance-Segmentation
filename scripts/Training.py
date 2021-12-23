@@ -1,7 +1,9 @@
 import os
 import torch
 import wandb
+import segmentation_models_pytorch as smp
 
+from segmentation_models_pytorch import utils
 from dotenv import dotenv_values
 from pprint import pprint
 from sklearn.preprocessing import LabelEncoder
@@ -27,7 +29,7 @@ def _get_kwargs(**kwargs):
 
 
 def _loop_fn(model: nn.Module, loader: DataLoader, log=False, mode="train", **kwargs):
-    kwargs = kwargs['kwargs']['kwargs']['kwargs']
+   """ kwargs = kwargs['kwargs']['kwargs']['kwargs']
     criterion = kwargs["criterion"]
     optimizer = kwargs["optimizer"]
     scheduler = None if "scheduler" not in kwargs.keys() else kwargs["scheduler"]
@@ -56,7 +58,7 @@ def _loop_fn(model: nn.Module, loader: DataLoader, log=False, mode="train", **kw
             optimizer.zero_grad()
         
         running_loss += loss.item()
-        running_iou += (outputs.argmax(1) == masks).sum().item()
+        # running_iou += (outputs.argmax(1) == masks).sum().item()
         
         if log:
             wandb.log({"loss": loss.item()})
@@ -71,16 +73,16 @@ def _loop_fn(model: nn.Module, loader: DataLoader, log=False, mode="train", **kw
             wandb.log({"epoch_loss": epoch_loss})
             wandb.log({"epoch_iou": epoch_iou})
             
-        return epoch_loss, epoch_iou, optimizer
+        return epoch_loss, epoch_iou, optimizer"""
 
 
-def _init_train(model_name, config=None, log=False, run=None):
+def _init_train(model_name, config=None, checkpoint=True, run=None):
     torch.set_default_tensor_type("torch.cuda.FloatTensor")
     model = make_model(model_name, config=config)
     model.cuda()
-    early_stopping: EarlyStopping
+    early_stopping = None
     
-    if log:
+    if checkpoint:
         early_stopping = EarlyStopping(model_dir=config.MODEL_PATH,
                                        model_name=model_name,
                                        run=run)
@@ -88,49 +90,66 @@ def _init_train(model_name, config=None, log=False, run=None):
     return model, early_stopping
 
 
-def _train(model_name, dataset: Dataset, config=None, log=False, run=None, **kwargs):
-    model, early_stopping = _init_train(model_name,
-                                       config=config,
-                                       log=log,
-                                       run=run)
+def _train(model_name, dataset: Dataset, config=None, log=False, run=None, device="cuda", checkpoint=True, **kwargs):
+
     
     total_train_ious = total_train_losses = []
     total_valid_ious = total_valid_losses = []
-    # print(type(dataset.folds))
-    # print(len(dataset.folds))
-    # print(dataset.folds)
-    criterion = None if "criterion" not in kwargs.keys() else kwargs["criterion"]
-    optimizer = None if "optimizer" not in kwargs.keys() else kwargs["optimizer"]
+    kwargs = kwargs["kwargs"]
+    criterion = kwargs["loss"]
+    optimizer = kwargs["optimizer"]
     scheduler = None if "scheduler" not in kwargs.keys() else kwargs["scheduler"]
     pprint(kwargs)
-    
-    if log:
-        wandb.watch(model, criterion, log_graph=True)
         
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
+        model, early_stopping = _init_train(model_name,
+                                        config=config,
+                                        checkpoint=checkpoint,
+                                        run=run)
+        if log:
+            wandb.watch(model, criterion, log_graph=True)
         # Create loaders
-        print(f"Fold {idx+1}\n")
+        print(f"\nFold: {idx+1}\n--------")
         dataset.dl_train = create_loader(dataset, train_idx, config=config)
         dataset.dl_valid = create_loader(dataset, valid_idx, config=config)
-        es_counter = 0
+        
+        train_epoch = smp.utils.train.TrainEpoch(
+            model, 
+            device=device,
+            verbose=True,
+            **kwargs
+        )
+        
+        valid_epoch = smp.utils.train.ValidEpoch(
+            model, 
+            device=device,
+            verbose=True,
+            metrics=kwargs["metrics"],
+            loss=kwargs["loss"]
+        )
+        
         for epoch in range(1, config.EPOCHS + 1):
-            print(f"Epoch: {epoch}")
-            # Train and get metrics back
-            train_epoch_loss, train_epoch_iou, optimizer = _loop_fn(model,
-                                                        loader=dataset.dl_train, 
-                                                        log=log,
-                                                        mode="train",
-                                                        kwargs=kwargs)
+            print(f"Epoch {epoch}")
             
-            valid_epoch_loss, valid_epoch_iou, _ = _loop_fn(model,
-                                                        loader=dataset.dl_valid,
-                                                        log=log,
-                                                        mode="test",
-                                                        kwargs=kwargs)
+            print()
+            train_logs = train_epoch.run(dataset.dl_train)
+            pprint({"train_logs": train_logs})
+            train_epoch_loss = train_logs['dice_loss']
+            train_epoch_iou = train_logs['iou_score']
             
+            print()
+            valid_logs = valid_epoch.run(dataset.dl_valid)
+            pprint({"valid_logs": valid_logs})
+            valid_epoch_loss = valid_logs['dice_loss']
+            valid_epoch_iou = valid_logs['iou_score']
+            
+            if log:
+                wandb.log({"train_logs": train_logs})
+                wandb.log({"valid_logs": valid_logs})
+                
             # Print epoch results
-            print(f"Epoch {idx+1} |\tTrain loss {train_epoch_loss:.4f} -- Train IoU (Intersection over Union) {train_epoch_iou:.4f}")
-            print(f"Epoch {idx+1} |\tValidation loss {valid_epoch_loss:.4f} -- Validation IoU (Intersection over Union) {valid_epoch_iou:.4f}")
+            print(f"\nTrain loss: {train_epoch_loss:.4f}\t Train iou: {train_epoch_iou:.4f}")
+            print(f"Validation loss: {valid_epoch_loss:.4f}\t Validation iou: {valid_epoch_iou:.4f}")
             
             total_train_losses.append(train_epoch_loss)
             total_train_ious.append(train_epoch_iou)
@@ -138,16 +157,14 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, **kwa
             total_valid_losses.append(valid_epoch_loss)
             total_valid_ious.append(valid_epoch_iou)
             
-            if log:
-                es_counter = early_stopping.checkpoint(model,
+            if early_stopping:
+                breakpoint = early_stopping.checkpoint(model,
                                                        epoch=epoch,
                                                        loss=valid_epoch_loss,
                                                        iou=valid_epoch_iou,
                                                        optimizer=optimizer)
-                
-                print(f"Patience currently: {es_counter}")
-                if es_counter >= early_stopping.patience:
-                    es_counter = 0
+            
+                if breakpoint:
                     break
         
     # Print all training and validation metrics    
@@ -163,8 +180,8 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, **kwa
     valid_avg_loss = mean(total_valid_losses)
     valid_avg_loss_std = stdev(total_valid_losses)
     
-    print(f"Average training IoU (Intersection over Union) of all folds:\t{train_avg_iou:.4f} +/- {train_avg_iou_std:.4f}")
-    print(f"Average validation IoU (Intersection over Union) of all folds:\t{valid_avg_iou:.4f} +/- {valid_avg_iou_std:.4f}\n")
+    print(f"Average training IoU of all folds:\t{train_avg_iou:.4f} +/- {train_avg_iou_std:.4f}")
+    print(f"Average validation IoU of all folds:\t{valid_avg_iou:.4f} +/- {valid_avg_iou_std:.4f}\n")
     
     print(f"Average training loss of all folds:\t{train_avg_loss:.4f} +/- {train_avg_loss_std:.4f}")
     print(f"Average validation loss of all folds:\t{valid_avg_loss:.4f} +/- {valid_avg_loss_std:.4f}")
@@ -183,98 +200,10 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, **kwa
         avg_metrics["valid_avg_loss"] = valid_avg_loss
         avg_metrics["valid_avg_loss_std"] = valid_avg_loss_std
         
-        wandb.log(avg_metrics)
+        wandb.log({"avg_metrics": avg_metrics})
 
 
-def _skf_train(model_name, dataset: Dataset, config=None, log=False, run=None, **kwargs):
-    model, early_stopping = _init_train(model_name,
-                                       config=config,
-                                       log=log)
-    
-    total_train_ious = total_train_losses = []
-    total_valid_ious = total_valid_losses = []
-
-    for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
-        # Create loaders
-        print(f"Fold {idx+1}\n")
-        dl_train = create_loader(dataset, train_idx, config=config)
-        dl_valid = create_loader(dataset, valid_idx, config=config)
-        
-        for epoch in range(1, config.EPOCHS + 1):
-            print(f"Epoch: {epoch}")
-            # Train and get metrics back
-            train_epoch_loss, train_epoch_iou, optimizer = _loop_fn(model,
-                                                        loader=dl_train, 
-                                                        log=log,
-                                                        mode="train",
-                                                        kwargs=kwargs)
-            
-            valid_epoch_loss, valid_epoch_iou, _ = _loop_fn(model,
-                                                        loader=dl_valid,
-                                                        log=log,
-                                                        mode="test",
-                                                        kwargs=kwargs)
-            
-            # Print epoch results
-            print(f"Epoch {idx+1} |\tTrain loss {train_epoch_loss:.4f} -- Train IoU (Intersection over Union) {train_epoch_iou:.4f}")
-            print(f"Epoch {idx+1} |\tValidation loss {valid_epoch_loss:.4f} -- Validation IoU (Intersection over Union) {valid_epoch_iou:.4f}")
-            
-            total_train_losses.append(train_epoch_loss)
-            total_train_ious.append(train_epoch_iou)
-            
-            total_valid_losses.append(valid_epoch_loss)
-            total_valid_ious.append(valid_epoch_iou)
-            
-            if log:
-                es_counter = early_stopping.checkpoint(model,
-                                                       epoch=epoch,
-                                                       loss=valid_epoch_loss,
-                                                       iou=valid_epoch_iou,
-                                                       optimizer=optimizer)
-                
-                print(f"Patience currently: {es_counter}")
-                if es_counter >= early_stopping.patience:
-                    es_counter = 0
-                    break
-        
-    # Print all training and validation metrics    
-    train_avg_iou = mean(total_train_ious)
-    train_avg_iou_std = stdev(total_train_ious)
-    
-    train_avg_loss = mean(total_train_losses)
-    train_avg_loss_std = stdev(total_train_losses)
-    
-    valid_avg_iou = mean(total_valid_ious)
-    valid_avg_iou_std = stdev(total_valid_ious)
-    
-    valid_avg_loss = mean(total_valid_losses)
-    valid_avg_loss_std = stdev(total_valid_losses)
-    
-    print(f"Average training IoU (Intersection over Union) of all folds:\t{train_avg_iou:.4f} +/- {train_avg_iou_std:.4f}")
-    print(f"Average validation IoU (Intersection over Union) of all folds:\t{valid_avg_iou:.4f} +/- {valid_avg_iou_std:.4f}\n")
-    
-    print(f"Average training loss of all folds:\t{train_avg_loss:.4f} +/- {train_avg_loss_std:.4f}")
-    print(f"Average validation loss of all folds:\t{valid_avg_loss:.4f} +/- {valid_avg_loss_std:.4f}")
-    
-    # Log the metrics if using wanb
-    if log:
-        avg_metrics = {}
-        
-        avg_metrics["train_avg_iou"] = train_avg_iou
-        avg_metrics["train_avg_iou_std"] = train_avg_iou_std
-        avg_metrics["train_avg_loss"] = train_avg_loss
-        avg_metrics["train_avg_loss_std"] = train_avg_loss_std
-        
-        avg_metrics["valid_avg_iou"] = valid_avg_iou
-        avg_metrics["valid_avg_iou_std"] = valid_avg_iou_std
-        avg_metrics["valid_avg_loss"] = valid_avg_loss
-        avg_metrics["valid_avg_loss_std"] = valid_avg_loss_std
-        
-        wandb.log(avg_metrics)
-    pass
-    
-
-def train(model_name, dataset: Dataset, config=None, log=False, **kwargs):
+def train(model_name, dataset: Dataset, config=None, log=False, checkpoint=True, **kwargs):
     # wandb implementation
     if log:
         conf = dotenv_values("config/.env")
@@ -293,7 +222,8 @@ def train(model_name, dataset: Dataset, config=None, log=False, **kwargs):
                 dataset=dataset, 
                 log=log, 
                 run=run,
-                kwargs=kwargs)
+                checkpoint=checkpoint,
+                kwargs=kwargs["kwargs"])
          
     # local implementation
     else:
@@ -301,7 +231,8 @@ def train(model_name, dataset: Dataset, config=None, log=False, **kwargs):
             config=config, 
             dataset=dataset, 
             log=log,
-            kwargs=kwargs)            
+            checkpoint=checkpoint,
+            kwargs=kwargs["kwargs"])            
     
 
 def dice_loss(input, target):
@@ -327,8 +258,7 @@ class FocalLoss(nn.Module):
         invprobs = F.logsigmoid(-input * (target * 2.0 - 1.0))
         loss = (invprobs * self.gamma).exp() * loss
         return loss.mean()
-    
-    
+      
 class MixedLoss(nn.Module):
     def __init__(self, alpha, gamma):
         super().__init__()
@@ -339,4 +269,3 @@ class MixedLoss(nn.Module):
         loss = self.alpha*self.focal(input, target) - torch.log(dice_loss(input, target))
         return loss.mean()
     
-

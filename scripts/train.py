@@ -1,6 +1,7 @@
 import argparse
 
 import pandas as pd
+import segmentation_models_pytorch as smp
 
 from datetime import datetime
 from pprint import pprint
@@ -22,6 +23,8 @@ parser.add_argument('--params_path', "-p", type=str, default="config/params.yaml
                     help='The path to the parameters.yaml file. Defaults to `config/params.yaml`')
 parser.add_argument('--log', "-l", type=str, default="True",
                     help='Boolean representing whether to log metrics to wandb or not. Defaults to `True`')
+parser.add_argument('--checkpoint', "-c", type=str, default="True",
+                    help='Boolean representing whether to save the model or not. Defaults to `True`')
 
 args = parser.parse_args().__dict__
 
@@ -32,6 +35,7 @@ if __name__ == "__main__":
     CONFIG_PATH = args["params_path"]
     LOG = args["log"] == "True"
     BACKBONE = args["backbone"]
+    CHECKPOINT = args["checkpoint"]
     
     print(f"\nLoading configuration from `{CONFIG_PATH}`...")
     config = Config(model_name=MODEL_NAME,
@@ -46,19 +50,23 @@ if __name__ == "__main__":
     print(df_train.info())
     
     # Dataset/loader prep
-    print("\nConfiguring training...")
+    print("\nConfiguring data...")
     ds_train = CellDataset(df_train, config=config)
     dl_train = DataLoader(ds_train, 
                           batch_size=config.BATCH_SIZE, 
                           num_workers=4, 
                           pin_memory=True, 
                           shuffle=False)
+    print("\nConfiguring data complete.")
     
+    print("\nCreating model...")
     model = make_model(model_name=MODEL_NAME, config=config)
-    criterion = MixedLoss(10.0, 2.0)
-    optimizer = optim.Adam(model.parameters(), lr=config.LEARNING_RATE)
-    torch_args = {"criterion": criterion,
-                  "optimizer": optimizer}
+    print("\nCreating model complete.")
+    
+    print("\nConfiguring hyperparameters...")
+    hyperparams = config.configure_hyperparameters(keys=set(["iou", "dice_loss", "adam"]), 
+                                                   model=model)
+    print("\nConfiguring hyperparameters complete.")
     
     start = datetime.now()
     
@@ -67,10 +75,11 @@ if __name__ == "__main__":
           dataset=ds_train,
           config=config,
           log=LOG,
-          kwargs=torch_args)
+          checkpoint=CHECKPOINT,
+          kwargs=hyperparams)
     
     end = datetime.now()
     train_time = end - start
-    print(f"\nTraining complete. Total training time: {train_time}")
+    print(f"\nTraining complete. Total training time {train_time}.")
     
     

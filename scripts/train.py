@@ -9,7 +9,7 @@ from pprint import pprint
 from torch import optim
 from torch.utils.data import DataLoader
 
-from Config import Config
+from config import Config
 from Utilities import CellDataset
 from Training import (make_model,
                        MixedLoss,

@@ -11,7 +11,6 @@ from tqdm import tqdm
 from pprint import pprint
 from Training import MixedLoss
 
-
 class Config:
     def __init__(self, model_name, backbone="resnet34", config_path="config/params.yaml"):
         """
@@ -19,16 +18,18 @@ class Config:
 
         Parameters
         ----------
-        `backbone` : `str`\n
+        `model_name` : `str`\n
             Name of the model
+        `backbone` : `str`\n
+            Name of the backbone
         """        
         
         with open(config_path, "r") as stream:
             self.base_cfg = yaml.safe_load(stream)
-            self.model_cfg = self.base_cfg[model_name]
-            self.cfg = self.model_cfg[backbone]
+            self.model_cfg = self.base_cfg["models"][model_name]
+            self.cfg = self.model_cfg["backbone"][backbone]
         
-        self.BACKBONE = backbone
+        self.BACKBONE = backbone # self.model_cfg["backbone"][backbone]
         self.DIRECTORY_PATH = self.base_cfg["project_path"]
         self.TRAIN_CSV = os.path.join(self.DIRECTORY_PATH, "train.csv")
         self.TRAIN_PATH = os.path.join(self.DIRECTORY_PATH, self.base_cfg["train"])
@@ -47,12 +48,17 @@ class Config:
         self.EPOCHS = self.cfg["epochs"]
         
         self.GITHUB_SHA = ""
+        self.AVAILABLE_MODELS = list(self.base_cfg["models"].keys())
         self.AVAILABLE_LOSSES = list(self.model_cfg["loss"].keys())
         self.AVAILABLE_METRICS = list(self.model_cfg["metrics"].keys())
         self.AVAILABLE_OPTIMIZERS = list(self.model_cfg["optimizer"].keys())
         
+        print("Available models:\t", self.AVAILABLE_MODELS)
+        print("Available losses:\t", self.AVAILABLE_LOSSES)
+        print("Available metrics:\t", self.AVAILABLE_METRICS)
+        print("Available optimizers:\t", self.AVAILABLE_OPTIMIZERS)
+        
         self.set_seed()
-    
     
     def set_seed(self):
         """
@@ -69,11 +75,10 @@ class Config:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
     
-
     def configure_hyperparameters(self, keys: set, model: nn.Module): 
         hyperparams = {"loss": None,
                        "optimizer": None,
-                       "metrics": None}
+                       "metrics": []}
         
         for k in tqdm(list(self.model_cfg.keys())):
             k_params = self.model_cfg[k]
@@ -83,15 +88,13 @@ class Config:
                 elif "mixed_loss" in keys:
                     hyperparams["loss"] = MixedLoss(**k_params["mixed_loss"])
                     
-                # hyperparams["loss"] = loss
-                    
             if "optimizer" == k:
                 if "adam" in keys:
                     hyperparams["optimizer"] = optim.Adam(params=model.parameters(), **k_params["adam"])
                     
             if "metrics" == k:
                 if "iou" in keys:
-                    hyperparams["metrics"] = [smp.utils.metrics.IoU(**k_params["iou"])]
+                    hyperparams["metrics"].append(smp.utils.metrics.IoU(**k_params["iou"]))
                     
-
         return hyperparams
+    

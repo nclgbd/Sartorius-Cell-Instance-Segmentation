@@ -12,67 +12,8 @@ from torch.nn import functional as F
 from tqdm import tqdm
 from statistics import (mean, 
                         stdev)
-from utils import (EarlyStopping, create_loader,
+from Utilities import (EarlyStopping, create_loader,
                    make_model)
-
-
-
-def _get_kwargs(**kwargs):
-    criterion = None if "criterion" not in list(kwargs.keys()) else kwargs["criterion"]
-    optimizer = None if "optimizer" not in list(kwargs.keys()) else kwargs["optimizer"]
-    scheduler = None if "scheduler" not in list(kwargs.keys()) else kwargs["scheduler"]
-    
-    return (criterion, 
-            optimizer, 
-            scheduler)
-
-
-def _loop_fn(model: nn.Module, loader: DataLoader, log=False, mode="train", **kwargs):
-   """ kwargs = kwargs['kwargs']['kwargs']['kwargs']
-    criterion = kwargs["criterion"]
-    optimizer = kwargs["optimizer"]
-    scheduler = None if "scheduler" not in kwargs.keys() else kwargs["scheduler"]
-    
-    if mode == "train":
-        model.train()
-    
-    elif mode == "test":
-        model.eval()
-    
-    n_batches = len(loader)
-    running_loss = running_iou = 0.0
-    optimizer.zero_grad()
-    loss = 0
-    for images, masks in tqdm(loader, desc=mode.title()):
-        # Predict
-        images, masks = images.cuda(),  masks.cuda()
-        outputs = model(images)
-        
-        loss = criterion(outputs, masks)
-        
-        # Back prop
-        if mode == "train":
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-        
-        running_loss += loss.item()
-        # running_iou += (outputs.argmax(1) == masks).sum().item()
-        
-        if log:
-            wandb.log({"loss": loss.item()})
-    
-        if scheduler:
-            scheduler.step(running_loss)
-
-        epoch_loss = running_loss / n_batches
-        epoch_iou = running_iou / n_batches
-        
-        if log:
-            wandb.log({"epoch_loss": epoch_loss})
-            wandb.log({"epoch_iou": epoch_iou})
-            
-        return epoch_loss, epoch_iou, optimizer"""
 
 
 def _init_train(model_name, config=None, checkpoint=True, run=None):
@@ -109,13 +50,11 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
                                         run=run)
         if log:
             wandb.watch(model, criterion, log_graph=True)
+            
         # Create loaders
         print(f"\nFold: {idx+1}\n--------")
         dataset.dl_train = dl_train = create_loader(dataset, train_idx, config=config)
         dataset.dl_valid = dl_valid = create_loader(dataset, valid_idx, config=config)
-        
-        #nxt = iter(deepcopy(dataset.dl_train))
-        #print(nxt.__next__())
         
         train_epoch = smp.utils.train.TrainEpoch(
             model, 

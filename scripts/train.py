@@ -10,13 +10,13 @@ from torch import optim
 from torch.utils.data import DataLoader
 
 from config import Config
-from utils import CellDataset
+from Utilities import CellDataset
 from Training import (make_model,
                        MixedLoss,
                        train)
 
 parser = argparse.ArgumentParser(description='Training script')
-parser.add_argument('--model_name', "-m", type=str, choices=['unet'],
+parser.add_argument('--model_name', "-m", type=str, choices=['unet', 'unetplusplus'],
                     help='the name of the model')
 parser.add_argument('--backbone', "-b", type=str, default="resnet34", choices=['resnet34'],
                     help='the name of the backbone. Defaults to `resnet34`')
@@ -26,17 +26,20 @@ parser.add_argument('--log', "-l", type=str, default="True",
                     help='Boolean representing whether to log metrics to wandb or not. Defaults to `True`')
 parser.add_argument('--checkpoint', "-c", type=str, default="True",
                     help='Boolean representing whether to save the model or not. Defaults to `True`')
+parser.add_argument('--sweep', "-s", type=str, default="False",
+                    help='Boolean representing whether to conduct a sweep. Currently unimplemented. Defaults to `False`')
 
 args = parser.parse_args().__dict__
 
 
-if __name__ == "__main__":
+def main():
     
     MODEL_NAME = args["model_name"]
     CONFIG_PATH = args["params_path"]
     LOG = args["log"] == "True"
     BACKBONE = args["backbone"]
     CHECKPOINT = args["checkpoint"]
+    SWEEP = args["sweep"] == "True"
     
     print(f"\nLoading configuration from `{CONFIG_PATH}`...")
     config = Config(model_name=MODEL_NAME,
@@ -53,11 +56,6 @@ if __name__ == "__main__":
     # Dataset/loader prep
     print("\nConfiguring data...")
     ds_train = CellDataset(df_train, config=config)
-    dl_train = DataLoader(ds_train, 
-                          batch_size=config.BATCH_SIZE, 
-                          num_workers=4, 
-                          pin_memory=True, 
-                          shuffle=False)
     print("Configuring data complete.\n")
     
     print(f"Creating model {MODEL_NAME}...")
@@ -82,5 +80,7 @@ if __name__ == "__main__":
     end = datetime.now()
     train_time = end - start
     print(f"\nTraining complete. Total training time {train_time}.")
-    
+     
+if __name__ == "__main__":
+      main()
     

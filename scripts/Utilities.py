@@ -32,10 +32,13 @@ CLASS_MAPPING_ID = {v:k for k, v in CLASS_MAPPING.items()}
 
 
 def make_model(model_name="unet", config=None):
+    model: nn.Module
     if model_name == "unet":
         model = smp.Unet(config.BACKBONE, encoder_weights="imagenet", activation=None)
-        # pprint(model)
-        return model
+    elif model_name == "unetplusplus":
+        model = smp.UnetPlusPlus(config.BACKBONE, encoder_weights="imagenet", activation=None)
+    
+    return model
     
 
 def create_loader(dataset: Dataset, idx, config=None, shuffle=False):

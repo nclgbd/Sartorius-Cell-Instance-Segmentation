@@ -11,7 +11,6 @@ from tqdm import tqdm
 from pprint import pprint
 from Training import MixedLoss
 
-
 class Config:
     def __init__(self, model_name, backbone="resnet34", config_path="config/params.yaml"):
         """
@@ -61,7 +60,6 @@ class Config:
         
         self.set_seed()
     
-    
     def set_seed(self):
         """
         Sets the random seed for the environment
@@ -77,7 +75,6 @@ class Config:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
     
-
     def configure_hyperparameters(self, keys: set, model: nn.Module): 
         hyperparams = {"loss": None,
                        "optimizer": None,
@@ -91,8 +88,6 @@ class Config:
                 elif "mixed_loss" in keys:
                     hyperparams["loss"] = MixedLoss(**k_params["mixed_loss"])
                     
-                # hyperparams["loss"] = loss
-                    
             if "optimizer" == k:
                 if "adam" in keys:
                     hyperparams["optimizer"] = optim.Adam(params=model.parameters(), **k_params["adam"])
@@ -101,5 +96,5 @@ class Config:
                 if "iou" in keys:
                     hyperparams["metrics"] = [smp.utils.metrics.IoU(**k_params["iou"])]
                     
-
         return hyperparams
+    

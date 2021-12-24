@@ -9,8 +9,8 @@ from pprint import pprint
 from torch import optim
 from torch.utils.data import DataLoader
 
-from config import Config
-from utils import CellDataset
+from Config import Config
+from Utilities import CellDataset
 from Training import (make_model,
                        MixedLoss,
                        train)

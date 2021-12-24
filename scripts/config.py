@@ -78,7 +78,7 @@ class Config:
     def configure_hyperparameters(self, keys: set, model: nn.Module): 
         hyperparams = {"loss": None,
                        "optimizer": None,
-                       "metrics": None}
+                       "metrics": []}
         
         for k in tqdm(list(self.model_cfg.keys())):
             k_params = self.model_cfg[k]
@@ -94,7 +94,7 @@ class Config:
                     
             if "metrics" == k:
                 if "iou" in keys:
-                    hyperparams["metrics"] = [smp.utils.metrics.IoU(**k_params["iou"])]
+                    hyperparams["metrics"].append(smp.utils.metrics.IoU(**k_params["iou"]))
                     
         return hyperparams
     

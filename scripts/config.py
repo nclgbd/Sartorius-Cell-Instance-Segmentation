@@ -12,7 +12,12 @@ from pprint import pprint
 from Training import MixedLoss
 
 class Config:
-    def __init__(self, model_name, backbone="resnet34", config_path="config/params.yaml"):
+    def __init__(self, model_name, 
+                 backbone="resnet34", 
+                 config_path="config/params.yaml", 
+                 log=False, 
+                 checkpoint=False, 
+                 sweep=False):
         """
         Configuration  class for all models
 
@@ -23,13 +28,18 @@ class Config:
         `backbone` : `str`\n
             Name of the backbone
         """        
+        self.MODEL_NAME = model_name
+        self.SWEEP = sweep
+        self.BACKBONE = backbone # self.model_cfg["backbone"][backbone]
+        self.LOG = log
+        self.CHECKPOINT = checkpoint
         
         with open(config_path, "r") as stream:
             self.base_cfg = yaml.safe_load(stream)
             self.model_cfg = self.base_cfg["models"][model_name]
+            self.sweep_cfg = self.base_cfg["sweeps"] if "sweeps" in list(self.base_cfg.keys()) and sweep else None
             self.cfg = self.model_cfg["backbone"][backbone]
         
-        self.BACKBONE = backbone # self.model_cfg["backbone"][backbone]
         self.DIRECTORY_PATH = self.base_cfg["project_path"]
         self.TRAIN_CSV = os.path.join(self.DIRECTORY_PATH, "train.csv")
         self.TRAIN_PATH = os.path.join(self.DIRECTORY_PATH, self.base_cfg["train"])
@@ -46,7 +56,7 @@ class Config:
         self.IMAGE_RESIZE = self.cfg["input_size"]
         self.BATCH_SIZE = self.cfg["batch_size"]
         self.EPOCHS = self.cfg["epochs"]
-        
+
         self.GITHUB_SHA = ""
         self.AVAILABLE_MODELS = list(self.base_cfg["models"].keys())
         self.AVAILABLE_LOSSES = list(self.model_cfg["loss"].keys())
@@ -74,27 +84,29 @@ class Config:
         torch.cuda.manual_seed_all(self.SEED)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
     
-    def configure_hyperparameters(self, keys: set, model: nn.Module): 
-        hyperparams = {"loss": None,
+    def configure_parameters(self, model: nn.Module): 
+        params = {"loss": None,
                        "optimizer": None,
                        "metrics": []}
         
         for k in tqdm(list(self.model_cfg.keys())):
             k_params = self.model_cfg[k]
+            keys = list(k_params.keys())
             if "loss" == k:
                 if "dice_loss" in keys:
-                    hyperparams["loss"] = smp.utils.losses.DiceLoss(**k_params["dice_loss"])
+                    params["loss"] = smp.utils.losses.DiceLoss(**k_params["dice_loss"])
                 elif "mixed_loss" in keys:
-                    hyperparams["loss"] = MixedLoss(**k_params["mixed_loss"])
+                    params["loss"] = MixedLoss(**k_params["mixed_loss"])
                     
             if "optimizer" == k:
                 if "adam" in keys:
-                    hyperparams["optimizer"] = optim.Adam(params=model.parameters(), **k_params["adam"])
+                    params["optimizer"] = optim.Adam(params=model.parameters(), **k_params["adam"])
                     
             if "metrics" == k:
                 if "iou" in keys:
-                    hyperparams["metrics"].append(smp.utils.metrics.IoU(**k_params["iou"]))
+                    params["metrics"].append(smp.utils.metrics.IoU(**k_params["iou"]))
                     
-        return hyperparams
+        return params
     

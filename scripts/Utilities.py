@@ -195,7 +195,6 @@ def wandb_mask(bg_img, gt_mask):
 
 
 class CellDataset(Dataset):
-    
     def __init__(self, df: pd.DataFrame, config=None):
         self.config = config
         self.df = df
@@ -258,11 +257,9 @@ class CellDataset(Dataset):
             test_size = 1.0/n_splits
             return list(train_test_split(X, y.argmax(1), 
                                     test_size=test_size, 
-                                    random_state=self.config.SEED))
-            
+                                    random_state=self.config.SEED)) 
        
 class EarlyStopping():
-    
     def __init__(self, 
                  model_dir:str, 
                  model_name:str, 
@@ -296,13 +293,14 @@ class EarlyStopping():
         self.best_model = None
         self.artifact: wandb.Artifact
         self.run = run
-        self.id = run.id if not config else config.GITHUB_SHA[:5]
+        self.config = config
+        self.id = run.id # if not config else config.GITHUB_SHA[:5]
         self.fname = "".join([self.model_name, f"-{self.id}", '.pth']) if run else self.model_name+'.pth'
             
         self.path = str(os.path.join(model_dir, self.fname))
         
         
-    def checkpoint(self, model:nn.Module, epoch:int, loss:float, iou:float, optimizer, log=False, checkpoint=True):
+    def checkpoint(self, model:nn.Module, epoch:int, loss:float, iou:float, optimizer)-> (bool):
         """
         Creates the checkpoint and keeps track of when we should stop training. 
         
@@ -316,13 +314,9 @@ class EarlyStopping():
             Current loss.
         `iou` : `float`\n
             Current IoU.
-        `optimizer`
-            The optimization function currently in use.
-        `log` : `bool`, `optional`\n
-            Boolean representing whether we're saving logging information to wandb, by default True.
         Returns
         -------
-        `int`\n
+        `bool`\n
             Returns a number representing the current level of patience reached.
         """        
         
@@ -337,11 +331,14 @@ class EarlyStopping():
                                'model_state_dict': model.state_dict(),
                                'optimizer_state_dict': optimizer.state_dict(),
                                'loss': self.min_loss,
-                               'iou': self.max_iou}
-            if checkpoint:
+                               'iou': self.max_iou}                
+            if self.config.LOG:
+                wandb.log(self.state_dict)
+                
+            if self.config.CHECKPOINT:
                 torch.save(self.state_dict, self.path)
                 
-                if log:
+                if self.config.LOG:
                     self.artifact = wandb.Artifact('unet', type='model')
                     self.artifact.add_file(self.path)
                     self.run.log_artifact(self.artifact)
@@ -352,6 +349,6 @@ class EarlyStopping():
         return self.check_patience()
 
 
-    def check_patience(self):
+    def check_patience(self)-> (bool):
         print(f"Patience: {self.count}/{self.patience}" )
         return self.count >= self.patience

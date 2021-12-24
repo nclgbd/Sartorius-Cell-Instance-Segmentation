@@ -2,7 +2,10 @@ import os
 import torch
 import wandb
 import segmentation_models_pytorch as smp
+import time
+import pandas as pd
 
+from datetime import datetime
 from dotenv import dotenv_values
 from pprint import pprint
 from torch import nn
@@ -13,7 +16,7 @@ from tqdm import tqdm
 from statistics import (mean, 
                         stdev)
 from Utilities import (EarlyStopping, create_loader,
-                   make_model)
+                   make_model, CellDataset)
 
 
 def _init_train(model_name, config=None, checkpoint=True, run=None):
@@ -31,7 +34,7 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
     return model, early_stopping
 
 
-def _train(model_name, dataset: Dataset, config=None, log=False, run=None, device="cuda", checkpoint=True, **kwargs):
+def _train(model_name, dataset: Dataset, config=None, run=None, device="cuda", **kwargs):
     total_train_ious = []
     total_train_losses = []
     total_valid_ious = []
@@ -46,9 +49,9 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
         model, early_stopping = _init_train(model_name,
                                         config=config,
-                                        checkpoint=checkpoint,
+                                        checkpoint=config.CHECKPOINT,
                                         run=run)
-        if log:
+        if config.LOG:
             wandb.watch(model, criterion, log_graph=True)
             
         # Create loaders
@@ -92,7 +95,7 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
             train_epoch_iou = train_logs['iou_score']  
             valid_epoch_iou = valid_logs['iou_score']
             
-            if log:
+            if config.LOG:
                 wandb.log({"train_logs": train_logs})
                 wandb.log({"valid_logs": valid_logs})
                 
@@ -111,8 +114,7 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
                                                        epoch=epoch,
                                                        loss=valid_epoch_loss,
                                                        iou=valid_epoch_iou,
-                                                       optimizer=optimizer,
-                                                       checkpoint=checkpoint)
+                                                       optimizer=optimizer)
             
                 if breakpoint:
                     break
@@ -137,7 +139,7 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
     print(f"Average validation loss of all folds:\t{valid_avg_loss:.4f} +/- {valid_avg_loss_std:.4f}")
     
     # Log the metrics if using wanb
-    if log:
+    if config.LOG:
         avg_metrics = {}
         
         avg_metrics["train_avg_iou"] = train_avg_iou
@@ -151,11 +153,37 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
         avg_metrics["valid_avg_loss_std"] = valid_avg_loss_std
         
         wandb.log({"avg_metrics": avg_metrics})
+      
+        
+def setup(config=None):
+    model_name = config.MODEL_NAME
+    print("\nLoading training data...")
+    df_train = pd.read_csv(config.TRAIN_CSV)
+    print("Loading training data complete.\n")
+    print(df_train.info())
 
+    print("\nConfiguring data...")
+    ds_train = CellDataset(df_train, config=config)
+    print("Configuring data complete.\n")
 
-def train(model_name, dataset: Dataset, config=None, log=False, checkpoint=True, **kwargs):
-    # wandb implementation
-    if log:
+    print(f"Creating model {model_name}...")
+    model = make_model(model_name=model_name, config=config)
+    print(f"Creating model {model_name} complete.\n")
+
+    print("Configuring hyperparameters...")
+    params = config.configure_parameters(model=model)
+    print("Configuring hyperparameters complete.\n")
+
+    return ds_train, params   
+        
+        
+def train(config=None):
+    ds_train, params = setup(config=config)
+    start = datetime.now()
+
+    print(f"\nConfiguration setup complete. Training began at {start} ...\n")
+    time.sleep(2)
+    if config.LOG:
         conf = dotenv_values("config/.env")
         os.environ['WANDB_API_KEY'] = conf["wandb_api_key"]
         github_sha = os.getenv('GITHUB_SHA')
@@ -167,24 +195,26 @@ def train(model_name, dataset: Dataset, config=None, log=False, checkpoint=True,
                         reinit=True)
         
         with run:
-            config = wandb.config
-            _train(model_name=model_name, 
+            _train(model_name=config.MODEL_NAME, 
                 config=config, 
-                dataset=dataset, 
-                log=log, 
+                dataset=ds_train, 
+                log=config.LOG,
                 run=run,
-                checkpoint=checkpoint,
-                kwargs=kwargs["kwargs"])
-         
+                checkpoint=config.CHECKPOINT,
+                kwargs=params)
     # local implementation
     else:
-        _train(model_name=model_name, 
+        _train(model_name=config.MODEL_NAME, 
             config=config, 
-            dataset=dataset, 
-            log=log,
-            checkpoint=checkpoint,
-            kwargs=kwargs["kwargs"])            
-    
+            dataset=ds_train, 
+            log=config.LOG,
+            checkpoint=config.CHECKPOINT,
+            kwargs=params)
+      
+    end = datetime.now()
+    train_time = end - start
+    print(f"\nTraining complete. Total training time {train_time}.")
+
 
 def dice_loss(input, target):
     input = torch.sigmoid(input)

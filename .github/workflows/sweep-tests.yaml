@@ -1,9 +1,9 @@
-name: Test train
+name: Test sweep
 
 on: 
   push:
     branches:
-      - develop-train*
+      - develop-train-sweeps*
 
 jobs:
   test-train-unet:
@@ -44,7 +44,7 @@ jobs:
       run: |
         mkdir "models"
         conda activate skc_env
-        python scripts/train.py --model_name=unet --log=False --params_path=config/test_params.yaml --checkpoint=False --sweep=False
+        python scripts/train.py --model_name=unet --log=True --params_path=config/test_params.yaml --checkpoint=False --sweep=True
   test-train-unetplusplus:
     runs-on: self-hosted
     steps:
@@ -83,5 +83,5 @@ jobs:
       run: |
         mkdir "models"
         conda activate skc_env
-        python scripts/train.py --model_name=unetplusplus --log=False --params_path=config/test_params.yaml --checkpoint=False --sweep=False
-        
+        python scripts/train.py --model_name=unetplusplus --log=True --params_path=config/test_params.yaml --checkpoint=False --sweep=True
+    

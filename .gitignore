@@ -5,4 +5,5 @@
 config/kaggle.json
 data/
 wandb/
+models/
 sartorius-complete-unet-understanding.ipynb

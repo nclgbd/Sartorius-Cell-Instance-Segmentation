@@ -7,8 +7,10 @@ import segmentation_models_pytorch as smp
 
 from torch import optim
 from torch import nn
+from tqdm import tqdm
 from pprint import pprint
 from Training import MixedLoss
+
 
 class Config:
     def __init__(self, model_name, backbone="resnet34", config_path="config/params.yaml"):
@@ -44,6 +46,11 @@ class Config:
         self.BATCH_SIZE = self.cfg["batch_size"]
         self.EPOCHS = self.cfg["epochs"]
         
+        self.GITHUB_SHA = ""
+        self.AVAILABLE_LOSSES = list(self.model_cfg["loss"].keys())
+        self.AVAILABLE_METRICS = list(self.model_cfg["metrics"].keys())
+        self.AVAILABLE_OPTIMIZERS = list(self.model_cfg["optimizer"].keys())
+        
         self.set_seed()
     
     
@@ -68,16 +75,15 @@ class Config:
                        "optimizer": None,
                        "metrics": None}
         
-        for k in self.model_cfg.keys():
+        for k in tqdm(list(self.model_cfg.keys())):
             k_params = self.model_cfg[k]
             if "loss" == k:
                 if "dice_loss" in keys:
-                    loss = smp.utils.losses.DiceLoss(**k_params["dice_loss"])
+                    hyperparams["loss"] = smp.utils.losses.DiceLoss(**k_params["dice_loss"])
                 elif "mixed_loss" in keys:
-                    loss = MixedLoss(**k_params["mixed_loss"])
+                    hyperparams["loss"] = MixedLoss(**k_params["mixed_loss"])
                     
-                loss.__name__ = "loss"
-                hyperparams["loss"] = loss
+                # hyperparams["loss"] = loss
                     
             if "optimizer" == k:
                 if "adam" in keys:
@@ -88,5 +94,4 @@ class Config:
                     hyperparams["metrics"] = [smp.utils.metrics.IoU(**k_params["iou"])]
                     
 
-        pprint(hyperparams)
         return hyperparams

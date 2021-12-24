@@ -1,8 +1,8 @@
 project_path: "data"
 train: "train"
 test: "test"
-model_path: "models"
 train_semi_supervised: "train_semi_supervised"
+model_path: "models"
 seed: 42
 kfold: true
 n_splits: 5
@@ -14,7 +14,6 @@ unet:
     input_size: [224, 224]
     epochs: 1000
     batch_size: 16
-
   metrics:
     iou:
       eps: 1

@@ -2,6 +2,7 @@ import argparse
 
 import pandas as pd
 import segmentation_models_pytorch as smp
+import time
 
 from datetime import datetime
 from pprint import pprint
@@ -57,20 +58,20 @@ if __name__ == "__main__":
                           num_workers=4, 
                           pin_memory=True, 
                           shuffle=False)
-    print("\nConfiguring data complete.")
+    print("Configuring data complete.\n")
     
-    print("\nCreating model...")
+    print(f"Creating model {MODEL_NAME}...")
     model = make_model(model_name=MODEL_NAME, config=config)
-    print("\nCreating model complete.")
+    print(f"Creating model {MODEL_NAME} complete.\n")
     
-    print("\nConfiguring hyperparameters...")
-    hyperparams = config.configure_hyperparameters(keys=set(["iou", "mixed_loss", "adam"]), 
+    print("Configuring hyperparameters...")
+    hyperparams = config.configure_hyperparameters(keys=["iou", "dice_loss", "adam"], 
                                                    model=model)
-    print("\nConfiguring hyperparameters complete.")
+    print("Configuring hyperparameters complete.\n")
     
     start = datetime.now()
-    
     print(f"\nConfiguration setup complete. Training began at {start} ...\n")
+    time.sleep(2)
     train(model_name=MODEL_NAME,
           dataset=ds_train,
           config=config,

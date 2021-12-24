@@ -3,7 +3,7 @@ name: Test train
 on: 
   push:
     branches:
-      - develop-train
+      - develop-train*
 
 jobs:
   test-train-unet:

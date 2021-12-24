@@ -14,7 +14,6 @@ unet:
     input_size: [224, 224]
     epochs: 1
     batch_size: 16
-
   metrics:
     iou:
       eps: 1

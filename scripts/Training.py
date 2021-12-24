@@ -3,10 +3,8 @@ import torch
 import wandb
 import segmentation_models_pytorch as smp
 
-from segmentation_models_pytorch import utils
 from dotenv import dotenv_values
 from pprint import pprint
-from sklearn.preprocessing import LabelEncoder
 from torch import nn
 from torch.utils.data import (DataLoader, 
                               Dataset)
@@ -18,10 +16,11 @@ from utils import (EarlyStopping, create_loader,
                    make_model)
 
 
+
 def _get_kwargs(**kwargs):
-    criterion = None if "criterion" not in kwargs.keys() else kwargs["criterion"]
-    optimizer = None if "optimizer" not in kwargs.keys() else kwargs["optimizer"]
-    scheduler = None if "scheduler" not in kwargs.keys() else kwargs["scheduler"]
+    criterion = None if "criterion" not in list(kwargs.keys()) else kwargs["criterion"]
+    optimizer = None if "optimizer" not in list(kwargs.keys()) else kwargs["optimizer"]
+    scheduler = None if "scheduler" not in list(kwargs.keys()) else kwargs["scheduler"]
     
     return (criterion, 
             optimizer, 
@@ -85,20 +84,22 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
     if checkpoint:
         early_stopping = EarlyStopping(model_dir=config.MODEL_PATH,
                                        model_name=model_name,
-                                       run=run)
+                                       run=run,
+                                       config=config)
     
     return model, early_stopping
 
 
 def _train(model_name, dataset: Dataset, config=None, log=False, run=None, device="cuda", checkpoint=True, **kwargs):
-
+    total_train_ious = []
+    total_train_losses = []
+    total_valid_ious = []
+    total_valid_losses = []
     
-    total_train_ious = total_train_losses = []
-    total_valid_ious = total_valid_losses = []
     kwargs = kwargs["kwargs"]
     criterion = kwargs["loss"]
     optimizer = kwargs["optimizer"]
-    scheduler = None if "scheduler" not in kwargs.keys() else kwargs["scheduler"]
+    scheduler = None if "scheduler" not in list(kwargs.keys()) else kwargs["scheduler"]
     pprint(kwargs)
         
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
@@ -110,8 +111,11 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
             wandb.watch(model, criterion, log_graph=True)
         # Create loaders
         print(f"\nFold: {idx+1}\n--------")
-        dataset.dl_train = create_loader(dataset, train_idx, config=config)
-        dataset.dl_valid = create_loader(dataset, valid_idx, config=config)
+        dataset.dl_train = dl_train = create_loader(dataset, train_idx, config=config)
+        dataset.dl_valid = dl_valid = create_loader(dataset, valid_idx, config=config)
+        
+        #nxt = iter(deepcopy(dataset.dl_train))
+        #print(nxt.__next__())
         
         train_epoch = smp.utils.train.TrainEpoch(
             model, 
@@ -130,17 +134,23 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
         
         for epoch in range(1, config.EPOCHS + 1):
             print(f"Epoch {epoch}")
-            
             print()
-            train_logs = train_epoch.run(dataset.dl_train)
-            pprint({"train_logs": train_logs})
-            train_epoch_loss = train_logs['dice_loss']
-            train_epoch_iou = train_logs['iou_score']
             
-            print()
-            valid_logs = valid_epoch.run(dataset.dl_valid)
-            pprint({"valid_logs": valid_logs})
-            valid_epoch_loss = valid_logs['dice_loss']
+            train_logs = train_epoch.run(dl_train)
+            pprint(train_logs)
+            
+            valid_logs = valid_epoch.run(dl_valid)
+            pprint(valid_logs)
+            
+            keys = list(train_logs.keys())
+            if "mixed_loss" in keys:
+                train_epoch_loss = train_logs['mixed_loss']
+                valid_epoch_loss = valid_logs['mixed_loss']
+            elif "dice_loss" in keys:
+                train_epoch_loss = train_logs['dice_loss']
+                valid_epoch_loss = valid_logs['dice_loss']
+                
+            train_epoch_iou = train_logs['iou_score']  
             valid_epoch_iou = valid_logs['iou_score']
             
             if log:
@@ -162,7 +172,8 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
                                                        epoch=epoch,
                                                        loss=valid_epoch_loss,
                                                        iou=valid_epoch_iou,
-                                                       optimizer=optimizer)
+                                                       optimizer=optimizer,
+                                                       checkpoint=checkpoint)
             
                 if breakpoint:
                     break
@@ -180,10 +191,10 @@ def _train(model_name, dataset: Dataset, config=None, log=False, run=None, devic
     valid_avg_loss = mean(total_valid_losses)
     valid_avg_loss_std = stdev(total_valid_losses)
     
-    print(f"Average training IoU of all folds:\t{train_avg_iou:.4f} +/- {train_avg_iou_std:.4f}")
-    print(f"Average validation IoU of all folds:\t{valid_avg_iou:.4f} +/- {valid_avg_iou_std:.4f}\n")
-    
+    print(f"\nAverage training iou of all folds:\t{train_avg_iou:.4f} +/- {train_avg_iou_std:.4f}")    
     print(f"Average training loss of all folds:\t{train_avg_loss:.4f} +/- {train_avg_loss_std:.4f}")
+    
+    print(f"Average validation iou of all folds:\t{valid_avg_iou:.4f} +/- {valid_avg_iou_std:.4f}")
     print(f"Average validation loss of all folds:\t{valid_avg_loss:.4f} +/- {valid_avg_loss_std:.4f}")
     
     # Log the metrics if using wanb
@@ -208,7 +219,8 @@ def train(model_name, dataset: Dataset, config=None, log=False, checkpoint=True,
     if log:
         conf = dotenv_values("config/.env")
         os.environ['WANDB_API_KEY'] = conf["wandb_api_key"]
-        pprint(config)
+        github_sha = os.getenv('GITHUB_SHA')
+        config.GITHUB_SHA = github_sha[:5] if github_sha else None
         
         run = wandb.init(project=conf["project"], 
                         entity=conf["entity"], 
@@ -264,6 +276,7 @@ class MixedLoss(nn.Module):
         super().__init__()
         self.alpha = alpha
         self.focal = FocalLoss(gamma)
+        self.__name__ = "mixed_loss"
 
     def forward(self, input, target):
         loss = self.alpha*self.focal(input, target) - torch.log(dice_loss(input, target))

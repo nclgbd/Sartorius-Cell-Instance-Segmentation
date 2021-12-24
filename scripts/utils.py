@@ -206,7 +206,7 @@ class CellDataset(Dataset):
         
         self.gb = self.df.groupby('id')
         self.image_ids = list(df.id.unique())
-        self.folds = self._split_data(n_splits=config.N_SPLITS)
+        self.folds = list(self._split_data(n_splits=config.N_SPLITS))
 
         self.dl_train: DataLoader
         self.dl_valid: DataLoader
@@ -234,17 +234,18 @@ class CellDataset(Dataset):
     def _split_data(self, n_splits=5):
         # creates folds
         n_splits = self.config.N_SPLITS if self.config else n_splits
+        X = []
+        y = []
         
-        X = [os.path.join(self.base_path, image_id+".png") for image_id in self.image_ids]
-        X = np.array(X)
-        # X = df_train["images"]
-        y = [build_masks(self.df, image_id, input_shape=(520, 704)) for image_id in self.image_ids]
-        y = np.array(y)
+        for image_id in tqdm(self.image_ids): 
+            X.append(os.path.join(self.base_path, image_id+".png"))
+            y.append(build_masks(self.df, image_id, input_shape=(520, 704)))
+        
+        X = np.array(X)   
+        y = np.array(y)  
         yn, nh, nw = y.shape
         y = y.reshape((yn, nh * nw))
         # mask = (mask >= 1).astype('float32')
-        
-        # self.df["image_paths"] = X
         
         if self.config.KFOLD:
             folds = StratifiedKFold(n_splits=n_splits, shuffle=True).split(X, y.argmax(1))
@@ -252,9 +253,9 @@ class CellDataset(Dataset):
         
         else:
             test_size = 1.0/n_splits
-            return train_test_split(X, y.argmax(1), 
+            return list(train_test_split(X, y.argmax(1), 
                                     test_size=test_size, 
-                                    random_state=self.config.SEED)
+                                    random_state=self.config.SEED))
             
        
 class EarlyStopping():
@@ -264,6 +265,7 @@ class EarlyStopping():
                  model_name:str, 
                  min_delta=0,
                  patience=5,
+                 config=None,
                  run=None):
         """
         Class for early stopping, because only plebs rely on set amounts of epochs.
@@ -291,7 +293,9 @@ class EarlyStopping():
         self.best_model = None
         self.artifact: wandb.Artifact
         self.run = run
-        self.fname = "".join([self.model_name, f"-{run.id}", '.pth']) if run else self.model_name+'.pth'
+        self.id = run.id if not config else config.GITHUB_SHA[:5]
+        self.fname = "".join([self.model_name, f"-{self.id}", '.pth']) if run else self.model_name+'.pth'
+            
         self.path = str(os.path.join(model_dir, self.fname))
         
         
@@ -343,6 +347,7 @@ class EarlyStopping():
             self.count += 1
             
         return self.check_patience()
+
 
     def check_patience(self):
         print(f"Patience: {self.count}/{self.patience}" )

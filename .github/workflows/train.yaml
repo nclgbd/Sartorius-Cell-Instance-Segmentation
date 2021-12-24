@@ -1,12 +1,12 @@
-name: Test train
+name: Train all models
 
 on: 
   push:
     branches:
-      - develop-train
+      - train*
 
 jobs:
-  test-train:
+  train:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v2
@@ -25,6 +25,8 @@ jobs:
         echo entity=nclgbd >> config/.env
         echo project=Sartorius-Cell-Instance-Segmentation >> config/.env
         echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
+
+        cat config/.env
     - name: Copying dataset
       shell: bash -l {0}
       run: |
@@ -38,10 +40,10 @@ jobs:
         unzip -o -q sartorius-cell-instance-segmentation.zip -d data
         rm -rf sartorius-cell-instance-segmentation.zip
         ls -la data/
-        echo "Moving data complete. Exit code $(echo $?)"
+        echo "Moving data complete. Exit code $(echo $?)."
     - name: Train
       shell: bash -l {0}
       run: |
         mkdir "models"
         conda activate skc_env
-        python scripts/train.py --model_name=unet --log=False --params_path=config/test_params.yaml --checkpoint=False
+        python scripts/train.py --model_name=unet --log=True --params_path=config/params.yaml --checkpoint=True

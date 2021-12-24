@@ -1,10 +1,10 @@
 project_path: "data"
 train: "train"
 test: "test"
-model_path: "models"
 train_semi_supervised: "train_semi_supervised"
+model_path: "models"
 seed: 42
-kfold: false
+kfold: true
 n_splits: 5
 
 unet:
@@ -12,9 +12,8 @@ unet:
     mean: [0.485, 0.456, 0.406]
     std: [0.229, 0.224, 0.225]
     input_size: [224, 224]
-    epochs: 10
+    epochs: 1000
     batch_size: 16
-
   metrics:
     iou:
       eps: 1

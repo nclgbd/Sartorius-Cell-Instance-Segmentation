@@ -1,102 +1,20 @@
-project_path: "data"
-train: "train"
-test: "test"
-train_semi_supervised: "train_semi_supervised"
-model_path: "models"
-seed: 42
-kfold: true
-n_splits: 5
-
-models:
-  unet:
-    backbone:
-      resnet34:
-        mean: [0.485, 0.456, 0.406]
-        std: [0.229, 0.224, 0.225]
-        input_size: [224, 224]
-        epochs: 1
-        batch_size: 16
-    metrics:
-      iou:
-        eps: 1
-        threshold: 0.5
-    loss: 
-      dice_loss:
-        eps: 1
-        beta: 1
-      # mixed_loss:
-      #   alpha: 10.0
-      #   gamma: 2.0
-    optimizer:
-      adam: 
-        eps: 1
-        betas: [0.9, 0.999]
-        lr: 0.001
-
-  # unetplusplus:
-  #   backbone:
-  #     resnet34:
-  #       mean: [0.485, 0.456, 0.406]
-  #       std: [0.229, 0.224, 0.225]
-  #       input_size: [224, 224]
-  #       epochs: 1
-  #       batch_size: 16
-  #   metrics:
-  #     iou:
-  #       eps: 1
-  #       threshold: 0.5
-  #   loss: 
-  #     dice_loss:
-  #       eps: 1
-  #       beta: 1
-  #     # mixed_loss:
-  #     #   alpha: 10.0
-  #     #   gamma: 2.0
-  #   optimizer:
-  #     adam: 
-  #       eps: 1
-  #       betas: [0.9, 0.999]
-  #       lr: 0.001
-
-sweeps:
-  method: random
-  metric:
-    name: valid_avg_iou
-    goal: maximize
-  parameters:
-    model_name:
-      values: ["unet", "unetplusplus"]
-    backbone:
-      value: "resnet34"
-    loss:
-      values: ["mixed_loss", "dice_loss"]
-    optimizer:
-      value: "adam"
-    batch_size:
-        values: [1, 2, 4, 8, 16, 32]
-    eps:
-      distribution: uniform
-      min: 0.1
-      max: 10
-    threshold:
-      distribution: uniform
-      min: 0.2
-      max: 0.8
-    alpha: 
-      distribution: uniform
-      min: 1.0
-      max: 100.0
-    gamma: 
-      distribution: uniform
-      min: 0.2
-      max: 20.0
-    eps:
-      distribution: uniform
-      min: 0.1
-      max: 10
-    betas: 
-      value: [0.9, 0.999]
-    lr: 
-      distribution: uniform
-      min: 0.0001
-      max: 0.1
+model_name: unet
+lr: 0.0001
+batch_size: 16
+iou:
+  eps: 1
+  threshold: 0.5
+dice_loss:
+  eps: 1
+  beta: 1
+adam: 
+  eps: 1
+unet:
+  encoder_name: "resnet34"
+  encoder_depth: 5
+  encoder_weights: "imagenet"
+  decoder_channels: 256
+  in_channels: 3
+  classes: 1
+  activation: null
+  aux_params: null

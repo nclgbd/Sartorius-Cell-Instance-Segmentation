@@ -1,0 +1,42 @@
+method: random
+program: scripts/train.py
+command:
+  - ${env}
+  - python
+  - ${program}
+  - --defaults_path
+  - config/defaults.yaml
+metric:
+  name: valid_avg_iou
+  goal: maximize
+parameters:
+  model_name:
+    values: ["unet", "unetplusplus"]
+  loss:
+    values: ["mixed_loss", "dice_loss"]
+  optimizer:
+    value: "adam"
+  batch_size:
+      values: [2, 4, 8, 16, 32]
+  eps:
+    distribution: uniform
+    min: 0.1
+    max: 10
+  threshold:
+    distribution: uniform
+    min: 0.2
+    max: 0.8
+  alpha: 
+    distribution: uniform
+    min: 1.0
+    max: 20.0
+  gamma: 
+    distribution: uniform
+    min: 0.2
+    max: 20.0
+  eps:
+    distribution: uniform
+    min: 0.1
+    max: 10
+  lr: 
+    values: [0.0001, 0.001, 0.01, 0.1]

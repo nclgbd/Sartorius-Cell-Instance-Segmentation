@@ -3,7 +3,7 @@ name: Test sweep
 on: 
   push:
     branches:
-      - develop-train-sweeps*
+      - test
 
 jobs:
   test-train-unet:

@@ -2,20 +2,20 @@
 model_name: unet
 config_path: "config"
 directory_path: "data"
-train_path: "data/train"
-test_path: "data/test"
-train_semi_supervised_path: "data/train_semi_supervised"
+train_path: "train"
+test_path: "test"
+train_semi_supervised_path: "train_semi_supervised"
 model_path: "models"
 
 
 # Filenames
-train_csv: "data/train.csv"
+train_csv: "train.csv"
 sweep_path: "sweep.yaml"
 params_path: "test_params.yaml"
 
 
 # Defaults
-log: true
+log: false
 checkpoint: false
 sweep: false
 kfold: true
@@ -33,7 +33,7 @@ unet:
   encoder_name: "resnet34"
   encoder_depth: 5
   encoder_weights: "imagenet"
-  decoder_channels: 256
+  decoder_channels: [256, 128, 64, 32, 16]
   in_channels: 3
   classes: 1
   activation: null

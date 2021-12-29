@@ -20,8 +20,7 @@ from config import configure_params
 
 def _init_train(model_name, config=None, checkpoint=True, run=None):
     torch.set_default_tensor_type("torch.cuda.FloatTensor")
-    model = make_model(config=config)
-    model.cuda()
+    config.model.cuda()
     early_stopping = None
 
     if checkpoint:
@@ -34,7 +33,7 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
             model_dir=config.model_path, model_name=model_name, run=run, config=config
         )
 
-    return model, early_stopping
+    return early_stopping
 
 
 def _train(dataset: Dataset, config=None, run=None, **kwargs):
@@ -52,11 +51,11 @@ def _train(dataset: Dataset, config=None, run=None, **kwargs):
 
 
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
-        model, early_stopping = _init_train(
+        early_stopping = _init_train(
             model_name, config=config, checkpoint=config.checkpoint, run=run
         )
         if config.log:
-            wandb.watch(model, criterion, log_graph=True)
+            wandb.watch(config.model, criterion, log_graph=True)
 
         # Create loaders
         print(f"\n\nFold: {idx+1}\n--------")
@@ -65,11 +64,11 @@ def _train(dataset: Dataset, config=None, run=None, **kwargs):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         train_epoch = smp.utils.train.TrainEpoch(
-            model, device=device, verbose=True, **kwargs
+            config.model, device=device, verbose=True, **kwargs
         )
 
         valid_epoch = smp.utils.train.ValidEpoch(
-            model,
+            config.model,
             device=device,
             verbose=True,
             metrics=kwargs["metrics"],
@@ -117,7 +116,7 @@ def _train(dataset: Dataset, config=None, run=None, **kwargs):
 
             if early_stopping:
                 breakpoint = early_stopping.checkpoint(
-                    model,
+                    config.model,
                     epoch=epoch,
                     loss=valid_epoch_loss,
                     iou=valid_epoch_iou,
@@ -171,8 +170,6 @@ def _train(dataset: Dataset, config=None, run=None, **kwargs):
 
 
 def setup(config=None):
-    model_name = config.model_name
-
     print("\nLoading training data...")
     df_train = pd.read_csv(config.train_csv)
     print("Loading training data complete.\n")
@@ -182,22 +179,22 @@ def setup(config=None):
     ds_train = CellDataset(df_train, config=config)
     print("Configuring data complete.\n")
 
-    print(f"Creating model {model_name}...")
-    model = make_model(config=config)
-    print(f"Creating model {model_name} complete.\n")
+    # print(f"Creating model {model_name}...")
+    # model = make_model(config=config)
+    # print(f"Creating model {model_name} complete.\n")
 
     print("Configuring parameters...")
-    params = configure_params(config=config, model=model)
+    model, params = configure_params(config=config)
     print("Configuring parameters complete.\n")
 
-    return ds_train, params
+    return ds_train, model, params
 
 
 def sweep_train(config=None):
 
     run = wandb.run
     config = config if config else wandb.config
-    ds_train, params = setup(config=config)
+    ds_train, model, params = setup(config=config)
     _train(config=config, run=run, dataset=ds_train, kwargs=params)
 
 

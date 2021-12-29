@@ -1,20 +1,23 @@
 model_name: unet
 lr: 0.0001
 batch_size: 16
-iou:
-  eps: 1
-  threshold: 0.5
-dice_loss:
-  eps: 1
-  beta: 1
-adam: 
-  eps: 1
-unet:
-  encoder_name: "resnet34"
-  encoder_depth: 5
-  encoder_weights: "imagenet"
-  decoder_channels: 256
-  in_channels: 3
-  classes: 1
-  activation: null
-  aux_params: null
+metrics:
+  iou:
+    eps: 1
+    threshold: 0.5
+loss:
+  dice_loss:
+    eps: 1
+    beta: 1
+optimizer:
+  adam: 
+    eps: 1
+# unet:
+#   encoder_name: "resnet34"
+#   encoder_depth: 5
+#   encoder_weights: "imagenet"
+#   decoder_channels: 256
+#   in_channels: 3
+#   classes: 1
+#   activation: null
+#   aux_params: null

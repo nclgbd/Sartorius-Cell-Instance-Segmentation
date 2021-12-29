@@ -23,7 +23,7 @@ def main():
     )
     
     print("Loading configuration complete.\n")
-    train(config=cfg)
+    train(model_name = cfg.model_name, config=cfg)
 
 if __name__ == "__main__":
     main()

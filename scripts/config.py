@@ -1,5 +1,6 @@
 import os
 import random
+from statistics import mode
 import numpy as np
 import torch
 import yaml
@@ -10,31 +11,33 @@ from torch import nn, optim
 from tqdm import tqdm
 
 from Losses import MixedLoss
+from Utilities import make_model
 
 
-def configure_params(config, model: nn.Module):
+def configure_params(config):
 
+    avail_params = config.avail_params
     model_name = config.model_name
-    params = {"model_name": model_name}
+    batch_size = config.batch_size
+    lr = config.lr
+    model = make_model(config)
+    model_params = model.parameters()
+    
+    config.model_params = model_params
+    config.model = model
+    params = {"model_name": model_name, "lr": lr, "batch_size": batch_size, "optimizer": None,
+              "loss": None, "metrics": []}
 
-    for k in tqdm(list(config.keys())):
-        k_params = config[k]
-        keys = list(k_params.keys())
+    for key, values in list(config.model_cfg.items()):
+        if type(values) == dict:
+            for n, kwargs in values.items():
+                if key == "optimizer": 
+                    params[key] = avail_params[n](params=model_params, **kwargs)
+                else:
+                    params[key] = avail_params[n](**kwargs)
 
-        if "dice_loss" in keys:
-            params["dice_loss"] = smp.utils.losses.DiceLoss(**k_params["dice_loss"])
+    return model, params
 
-        if "mixed_loss" in keys:
-            params["mixed_loss"] = MixedLoss(**k_params["mixed_loss"])
-
-        if "adam" in keys:
-            params["adam"] = optim.Adam(params=model.parameters(), **k_params["adam"])
-
-        if "iou" in keys:
-            params["iou"].append(smp.utils.metrics.IoU(**k_params["iou"]))
-
-    # self.params = params
-    return params
 
 class Config:
     def __init__(
@@ -49,6 +52,13 @@ class Config:
         `defaults_path` : `str`\n
             Path to the default configuration
         """
+        self.avail_params = {
+            "iou": smp.utils.metrics.IoU,
+            "dice_loss": smp.utils.losses.DiceLoss,
+            "mixed_loss": MixedLoss,
+            "adam": optim.Adam,
+        }
+        
         with open(defaults_path, "r") as stream:
             self.defaults_cfg = yaml.safe_load(stream)
             self.defaults_path = defaults_path
@@ -94,6 +104,11 @@ class Config:
             self.std = self.defaults_cfg["std"]
             self.image_resize = self.defaults_cfg["image_resize"]
 
+            # Models
+            self.unet_params = self.defaults_cfg["unet"]
+            self.unetplusplus_params = self.defaults_cfg["unetplusplus"]
+            self.model: nn.Module
+
             self.github_sha = ""
 
         with open(self.params_path, "r") as stream:
@@ -101,13 +116,19 @@ class Config:
             print("\nParameters path:", {self.params_path})
             pprint(self.model_cfg)
 
-            self.model_name = self.model_cfg["model_name"]
+            # self.model_name = self.model_cfg["model_name"]
+            self.lr = self.model_cfg["lr"]
             self.batch_size = self.model_cfg["batch_size"]
+            self.metrics = self.model_cfg["metrics"]
+            self.loss = self.model_cfg["loss"]
+            self.optimizer = self.model_cfg["optimizer"]
+            self.model_params = None
 
         with open(self.sweep_path, "r") as stream:
             self.sweep_cfg = yaml.safe_load(stream)
             print("\nSweep configuration path:", {self.sweep_path})
             pprint(self.sweep_cfg)
+
 
         self.set_seed()
         print("")

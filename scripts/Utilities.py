@@ -34,7 +34,11 @@ CLASS_MAPPING_ID = {v: k for k, v in CLASS_MAPPING.items()}
 def make_model(config=None):
     model: nn.Module
     model_name = config.model_name
-    kwargs = config.model[model_name]
+    if model_name == "unet":
+        kwargs = config.unet_params
+    elif model_name == "unetplusplus":
+        kwargs = config.unetplusplus_params
+    
     if model_name == "unet":
         model = smp.Unet(**kwargs)
     elif model_name == "unetplusplus":

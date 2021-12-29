@@ -12,12 +12,4 @@ loss:
 optimizer:
   adam: 
     eps: 1
-# unet:
-#   encoder_name: "resnet34"
-#   encoder_depth: 5
-#   encoder_weights: "imagenet"
-#   decoder_channels: 256
-#   in_channels: 3
-#   classes: 1
-#   activation: null
-#   aux_params: null
+    

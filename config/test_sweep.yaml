@@ -10,8 +10,6 @@ metric:
   name: valid_avg_iou
   goal: maximize
 parameters:
-  model_name:
-    values: ["unet", "unetplusplus"]
   loss:
     values: ["mixed_loss", "dice_loss"]
   optimizer:

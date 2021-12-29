@@ -17,22 +17,24 @@ from Utilities import make_model
 def configure_params(config):
 
     avail_params = config.avail_params
-    model_name = config.model_name
-    batch_size = config.batch_size
-    lr = config.lr
     model = make_model(config)
     model_params = model.parameters()
-    
+
     config.model_params = model_params
     config.model = model
-    params = {"model_name": model_name, "lr": lr, "batch_size": batch_size, "optimizer": None,
-              "loss": None, "metrics": []}
+    params = {
+        "optimizer": None,
+        "loss": None,
+        "metrics": [],
+    }
 
     for key, values in list(config.model_cfg.items()):
         if type(values) == dict:
             for n, kwargs in values.items():
-                if key == "optimizer": 
+                if key == "optimizer":
                     params[key] = avail_params[n](params=model_params, **kwargs)
+                elif key == "metrics":
+                    params[key].append(avail_params[n](**kwargs))
                 else:
                     params[key] = avail_params[n](**kwargs)
 
@@ -58,7 +60,7 @@ class Config:
             "mixed_loss": MixedLoss,
             "adam": optim.Adam,
         }
-        
+
         with open(defaults_path, "r") as stream:
             self.defaults_cfg = yaml.safe_load(stream)
             self.defaults_path = defaults_path
@@ -129,7 +131,7 @@ class Config:
             print("\nSweep configuration path:", {self.sweep_path})
             pprint(self.sweep_cfg)
 
-
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.set_seed()
         print("")
 

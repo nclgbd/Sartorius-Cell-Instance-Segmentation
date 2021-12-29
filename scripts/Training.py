@@ -20,7 +20,6 @@ from config import configure_params
 
 def _init_train(model_name, config=None, checkpoint=True, run=None):
     torch.set_default_tensor_type("torch.cuda.FloatTensor")
-    config.model.cuda()
     early_stopping = None
 
     if checkpoint:
@@ -36,7 +35,7 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
     return early_stopping
 
 
-def _train(dataset: Dataset, config=None, run=None, **kwargs):
+def _train(model, dataset: Dataset, config=None, run=None, **kwargs):
     total_train_ious = []
     total_train_losses = []
     total_valid_ious = []
@@ -46,38 +45,43 @@ def _train(dataset: Dataset, config=None, run=None, **kwargs):
     kwargs = kwargs["kwargs"]
     criterion = kwargs["loss"]
     optimizer = kwargs["optimizer"]
-    scheduler = None if "scheduler" not in list(kwargs.keys()) else kwargs["scheduler"]
+    metrics = kwargs["metrics"]
+    # scheduler = None if "scheduler" not in list(kwargs.keys()) else kwargs["scheduler"]
     pprint(kwargs)
-
 
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
         early_stopping = _init_train(
             model_name, config=config, checkpoint=config.checkpoint, run=run
         )
         if config.log:
-            wandb.watch(config.model, criterion, log_graph=True)
+            wandb.watch(model, criterion, log_graph=True)
 
         # Create loaders
         print(f"\n\nFold: {idx+1}\n--------")
         dl_train = create_loader(dataset, train_idx, config=config)
         dl_valid = create_loader(dataset, valid_idx, config=config)
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        train_epoch = smp.utils.train.TrainEpoch(
-            config.model, device=device, verbose=True, **kwargs
-        )
-
-        valid_epoch = smp.utils.train.ValidEpoch(
-            config.model,
-            device=device,
-            verbose=True,
-            metrics=kwargs["metrics"],
-            loss=kwargs["loss"],
-        )
 
         for epoch in range(1, config.epochs + 1):
             print(f"Epoch {epoch}")
             print()
+
+            train_epoch = smp.utils.train.TrainEpoch(
+                model,
+                device=config.device,
+                verbose=True,
+                loss=criterion,
+                metrics=metrics,
+                optimizer=optimizer,
+            )
+
+            valid_epoch = smp.utils.train.ValidEpoch(
+                model,
+                device=config.device,
+                verbose=True,
+                metrics=metrics,
+                loss=criterion,
+            )
 
             train_logs = train_epoch.run(dl_train)
             pprint(train_logs)
@@ -116,7 +120,7 @@ def _train(dataset: Dataset, config=None, run=None, **kwargs):
 
             if early_stopping:
                 breakpoint = early_stopping.checkpoint(
-                    config.model,
+                    model,
                     epoch=epoch,
                     loss=valid_epoch_loss,
                     iou=valid_epoch_iou,
@@ -179,13 +183,9 @@ def setup(config=None):
     ds_train = CellDataset(df_train, config=config)
     print("Configuring data complete.\n")
 
-    # print(f"Creating model {model_name}...")
-    # model = make_model(config=config)
-    # print(f"Creating model {model_name} complete.\n")
-
-    print("Configuring parameters...")
+    print("Configuring parameters and creating model...")
     model, params = configure_params(config=config)
-    print("Configuring parameters complete.\n")
+    print("Configuration and creation complete.\n")
 
     return ds_train, model, params
 
@@ -195,7 +195,7 @@ def sweep_train(config=None):
     run = wandb.run
     config = config if config else wandb.config
     ds_train, model, params = setup(config=config)
-    _train(config=config, run=run, dataset=ds_train, kwargs=params)
+    _train(model=model, config=config, run=run, dataset=ds_train, kwargs=params)
 
 
 def train(model_name, config=None):
@@ -212,7 +212,7 @@ def train(model_name, config=None):
         if config.sweep:
             sweep_config = config.sweep_config
             sweep_id = wandb.sweep(sweep_config, project=conf["project"])
-            
+
         run = wandb.init(
             project=conf["project"],
             entity=conf["entity"],
@@ -227,8 +227,9 @@ def train(model_name, config=None):
                 wandb.agent(sweep_id, sweep_train, count=config.count)
 
             else:
-                ds_train, params = setup(config=config)
+                ds_train, model, params = setup(config=config)
                 _train(
+                    model=model,
                     config=config,
                     dataset=ds_train,
                     log=config.log,
@@ -238,8 +239,9 @@ def train(model_name, config=None):
                 )
     # local implementation
     else:
-        ds_train, params = setup(config=config)
+        ds_train, model, params = setup(config=config)
         _train(
+            model=model,
             config=config,
             dataset=ds_train,
             log=config.log,
@@ -249,5 +251,3 @@ def train(model_name, config=None):
 
     end = datetime.now()
     print(f"\nTraining complete. Total training time {end-start}.")
-
-

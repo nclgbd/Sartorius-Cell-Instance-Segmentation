@@ -31,28 +31,29 @@ CLASS_MAPPING = {0: "shsy5y", 1: "cort", 2: "astro"}
 CLASS_MAPPING_ID = {v: k for k, v in CLASS_MAPPING.items()}
 
 
-def make_model(config=None):
+def make_model(config=None, cuda=True):
     model: nn.Module
     model_name = config.model_name
     if model_name == "unet":
         kwargs = config.unet_params
     elif model_name == "unetplusplus":
         kwargs = config.unetplusplus_params
-    
+
     if model_name == "unet":
         model = smp.Unet(**kwargs)
     elif model_name == "unetplusplus":
         model = smp.UnetPlusPlus(**kwargs)
 
+    if cuda:
+        model.cuda()
     return model
 
 
 def create_loader(dataset: Dataset, idx, config=None, shuffle=False):
+    ds = torch.utils.data.Subset(dataset, idx)
     loader = DataLoader(
-        torch.utils.data.Subset(dataset, idx),
+        ds,
         batch_size=config.batch_size,
-        num_workers=4,
-        pin_memory=True,
         shuffle=shuffle,
     )
 

@@ -5,7 +5,7 @@ command:
   - python
   - ${program}
   - --defaults_path
-  - config/defaults.yaml
+  - config/test_defaults.yaml
 metric:
   name: valid_avg_iou
   goal: maximize

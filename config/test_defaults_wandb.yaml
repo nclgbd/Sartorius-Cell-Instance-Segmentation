@@ -15,7 +15,7 @@ params_path: "test_params.yaml"
 
 
 # Defaults
-log: false
+log: true
 checkpoint: false
 sweep: false
 kfold: true

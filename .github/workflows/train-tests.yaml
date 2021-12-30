@@ -1,4 +1,4 @@
-name: Test train
+name: test train
 
 on: 
   push:
@@ -6,6 +6,7 @@ on:
       - develop-train*
 
 jobs:
+  # OFFLINE TESTS
   test-train-unet:
     runs-on: self-hosted
     steps:
@@ -28,8 +29,6 @@ jobs:
     - name: Copying dataset
       shell: bash -l {0}
       run: |
-        export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
-        export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
         printenv | sort
 
         echo "Copying `sartorius-cell-instance-segmentation.zip` to current directory..."
@@ -44,8 +43,10 @@ jobs:
       run: |
         mkdir "models"
         conda activate skc_env
-        python scripts/train.py --model_name=unet --log=False --params_path=config/test_params.yaml --checkpoint=False --sweep=False
-  test-train-unetplusplus:
+        python scripts/train.py --defaults_path config/test_defaults.yaml
+
+  # WANDB IMPLEMENTATION
+  test-train-unet-wandb:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v2
@@ -67,8 +68,6 @@ jobs:
     - name: Copying dataset
       shell: bash -l {0}
       run: |
-        export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
-        export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
         printenv | sort
 
         echo "Copying `sartorius-cell-instance-segmentation.zip` to current directory..."
@@ -83,5 +82,9 @@ jobs:
       run: |
         mkdir "models"
         conda activate skc_env
-        python scripts/train.py --model_name=unetplusplus --log=False --params_path=config/test_params.yaml --checkpoint=False --sweep=False
-        
+        python scripts/train.py --defaults_path config/test_defaults_wandb.yaml
+
+
+
+  # SWEEP IMPLEMENTATION
+    # TODO teehee

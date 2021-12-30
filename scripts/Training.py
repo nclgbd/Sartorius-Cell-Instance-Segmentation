@@ -25,8 +25,6 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
     if checkpoint:
         if not config:
             raise ValueError("Cannot employ checkpointing without a configuration file")
-        if not run:
-            raise ValueError("Cannot employ checkpointing without a run instance")
 
         early_stopping = EarlyStopping(
             model_dir=config.model_path, model_name=model_name, run=run, config=config

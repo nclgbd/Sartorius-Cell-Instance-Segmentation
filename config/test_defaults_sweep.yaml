@@ -10,13 +10,13 @@ model_path: "models"
 
 # Filenames
 train_csv: "data/train.csv"
-sweep_path: "sweep.yaml"
-params_path: "test_params.yaml"
+sweep_path: "data/test_sweep.yaml"
+params_path: "data/test_params.yaml"
 
 
 # Defaults
 log: true
-checkpoint: false
+checkpoint: true
 sweep: false
 kfold: true
 seed: 42

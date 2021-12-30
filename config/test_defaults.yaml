@@ -10,7 +10,7 @@ model_path: "models"
 
 # Filenames
 train_csv: "train.csv"
-sweep_path: "test_sweep.yaml"
+sweep_path: "sweep.yaml"
 params_path: "test_params.yaml"
 
 

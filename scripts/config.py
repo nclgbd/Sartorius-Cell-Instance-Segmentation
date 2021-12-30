@@ -1,6 +1,5 @@
 import os
 import random
-from statistics import mode
 import numpy as np
 import torch
 import yaml
@@ -8,22 +7,20 @@ import segmentation_models_pytorch as smp
 
 from pprint import pprint
 from torch import nn, optim
-from tqdm import tqdm
 
 from Losses import MixedLoss
 from Utilities import make_model
 
-AVAIL_PARAMS = {
-    "iou": smp.utils.metrics.IoU,
-    "dice_loss": smp.utils.losses.DiceLoss,
-    "mixed_loss": MixedLoss,
-    "adam": optim.Adam,
-}
 
 
 def configure_params(config, model_cfg):
 
-    avail_params = AVAIL_PARAMS
+    avail_params = {
+        "iou": smp.utils.metrics.IoU,
+        "dice_loss": smp.utils.losses.DiceLoss,
+        "mixed_loss": MixedLoss,
+        "adam": optim.Adam,
+    }
     model = make_model(config)
     model_params = model.parameters()
 

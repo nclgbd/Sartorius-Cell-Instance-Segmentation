@@ -16,7 +16,7 @@ params_path: "test_params.yaml"
 
 # Defaults
 log: false
-checkpoint: false
+checkpoint: true
 sweep: false
 kfold: true
 seed: 42

@@ -13,22 +13,29 @@ from tqdm import tqdm
 from Losses import MixedLoss
 from Utilities import make_model
 
+AVAIL_PARAMS = {
+    "iou": smp.utils.metrics.IoU,
+    "dice_loss": smp.utils.losses.DiceLoss,
+    "mixed_loss": MixedLoss,
+    "adam": optim.Adam,
+}
 
-def configure_params(config):
 
-    avail_params = config.avail_params
+def configure_params(config, model_cfg):
+
+    avail_params = AVAIL_PARAMS
     model = make_model(config)
     model_params = model.parameters()
 
-    config.model_params = model_params
-    config.model = model
+    # config.model_params = model_params
+    # config.model = model
     params = {
         "optimizer": None,
         "loss": None,
         "metrics": [],
     }
 
-    for key, values in list(config.model_cfg.items()):
+    for key, values in list(model_cfg.items()):
         if type(values) == dict:
             for n, kwargs in values.items():
                 if key == "optimizer":
@@ -54,12 +61,6 @@ class Config:
         `defaults_path` : `str`\n
             Path to the default configuration
         """
-        self.avail_params = {
-            "iou": smp.utils.metrics.IoU,
-            "dice_loss": smp.utils.losses.DiceLoss,
-            "mixed_loss": MixedLoss,
-            "adam": optim.Adam,
-        }
 
         with open(defaults_path, "r") as stream:
             self.defaults_cfg = yaml.safe_load(stream)
@@ -107,8 +108,8 @@ class Config:
             self.image_resize = self.defaults_cfg["image_resize"]
 
             # Models
-            self.unet_params = self.defaults_cfg["unet"]
-            self.unetplusplus_params = self.defaults_cfg["unetplusplus"]
+            self.unet = self.defaults_cfg["unet"]
+            self.unetplusplus = self.defaults_cfg["unetplusplus"]
             self.model: nn.Module
 
             self.github_sha = ""
@@ -131,7 +132,6 @@ class Config:
             print("\nSweep configuration path:", {self.sweep_path})
             pprint(self.sweep_cfg)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.set_seed()
         print("")
 

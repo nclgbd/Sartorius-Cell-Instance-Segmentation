@@ -33,7 +33,7 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
     return early_stopping
 
 
-def _train(model, dataset: Dataset, config=None, run=None, **kwargs):
+def _train(model, dataset: Dataset, config=None, model_config=None, run=None, **kwargs):
     total_train_ious = []
     total_train_losses = []
     total_valid_ious = []
@@ -46,18 +46,19 @@ def _train(model, dataset: Dataset, config=None, run=None, **kwargs):
     metrics = kwargs["metrics"]
     # scheduler = None if "scheduler" not in list(kwargs.keys()) else kwargs["scheduler"]
     pprint(kwargs)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    if config.log:
+        wandb.watch(model, criterion, log_graph=True)
 
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
         early_stopping = _init_train(
             model_name, config=config, checkpoint=config.checkpoint, run=run
         )
-        if config.log:
-            wandb.watch(model, criterion, log_graph=True)
 
         # Create loaders
         print(f"\n\nFold: {idx+1}\n--------")
-        dl_train = create_loader(dataset, train_idx, config=config)
-        dl_valid = create_loader(dataset, valid_idx, config=config)
+        dl_train = create_loader(dataset, train_idx, config=model_config)
+        dl_valid = create_loader(dataset, valid_idx, config=model_config)
 
 
         for epoch in range(1, config.epochs + 1):
@@ -66,7 +67,7 @@ def _train(model, dataset: Dataset, config=None, run=None, **kwargs):
 
             train_epoch = smp.utils.train.TrainEpoch(
                 model,
-                device=config.device,
+                device=device,
                 verbose=True,
                 loss=criterion,
                 metrics=metrics,
@@ -75,7 +76,7 @@ def _train(model, dataset: Dataset, config=None, run=None, **kwargs):
 
             valid_epoch = smp.utils.train.ValidEpoch(
                 model,
-                device=config.device,
+                device=device,
                 verbose=True,
                 metrics=metrics,
                 loss=criterion,
@@ -171,7 +172,7 @@ def _train(model, dataset: Dataset, config=None, run=None, **kwargs):
         wandb.log({"avg_metrics": avg_metrics})
 
 
-def setup(config=None):
+def setup(config=None, model_cfg=None):
     print("\nLoading training data...")
     df_train = pd.read_csv(config.train_csv)
     print("Loading training data complete.\n")
@@ -182,7 +183,7 @@ def setup(config=None):
     print("Configuring data complete.\n")
 
     print("Configuring parameters and creating model...")
-    model, params = configure_params(config=config)
+    model, params = configure_params(config=config, model_cfg=model_cfg)
     print("Configuration and creation complete.\n")
 
     return ds_train, model, params
@@ -192,8 +193,8 @@ def sweep_train(config=None):
 
     run = wandb.run
     config = config if config else wandb.config
-    ds_train, model, params = setup(config=config)
-    _train(model=model, config=config, run=run, dataset=ds_train, kwargs=params)
+    # ds_train, model, params = setup(config=config, model_cfg=model_cfg)
+    # _train(model=model, config=config, run=run, dataset=ds_train, kwargs=params)
 
 
 def train(model_name, config=None):
@@ -201,6 +202,7 @@ def train(model_name, config=None):
     print(f"\nConfiguration setup complete. Training began at {start} ...\n")
     time.sleep(2)
     defaults_cfg = config.defaults_cfg
+    model_cfg = config.model_cfg
     if config.log:
         conf = dotenv_values("config/.env")
         os.environ["WANDB_API_KEY"] = conf["wandb_api_key"]
@@ -208,8 +210,8 @@ def train(model_name, config=None):
         config.github_sha = github_sha[:5] if github_sha else None
 
         if config.sweep:
-            sweep_config = config.sweep_config
-            sweep_id = wandb.sweep(sweep_config, project=conf["project"])
+            sweep_cfg = config.sweep_cfg
+            sweep_id = wandb.sweep(sweep_cfg, project=conf["project"])
 
         run = wandb.init(
             project=conf["project"],
@@ -225,10 +227,11 @@ def train(model_name, config=None):
                 wandb.agent(sweep_id, sweep_train, count=config.count)
 
             else:
-                ds_train, model, params = setup(config=config)
+                ds_train, model, params = setup(config=config, model_cfg=model_cfg)
                 _train(
                     model=model,
                     config=config,
+                    model_config=model_cfg,
                     dataset=ds_train,
                     log=config.log,
                     run=run,
@@ -237,10 +240,11 @@ def train(model_name, config=None):
                 )
     # local implementation
     else:
-        ds_train, model, params = setup(config=config)
+        ds_train, model, params = setup(config=config, model_cfg=model_cfg)
         _train(
             model=model,
             config=config,
+            model_config=model_cfg,
             dataset=ds_train,
             log=config.log,
             checkpoint=config.checkpoint,

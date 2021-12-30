@@ -35,13 +35,10 @@ def make_model(config=None, cuda=True):
     model: nn.Module
     model_name = config.model_name
     if model_name == "unet":
-        kwargs = config.unet_params
-    elif model_name == "unetplusplus":
-        kwargs = config.unetplusplus_params
-
-    if model_name == "unet":
+        kwargs = config.unet
         model = smp.Unet(**kwargs)
     elif model_name == "unetplusplus":
+        kwargs = config.unetplusplus
         model = smp.UnetPlusPlus(**kwargs)
 
     if cuda:
@@ -53,7 +50,7 @@ def create_loader(dataset: Dataset, idx, config=None, shuffle=False):
     ds = torch.utils.data.Subset(dataset, idx)
     loader = DataLoader(
         ds,
-        batch_size=config.batch_size,
+        batch_size=config["batch_size"],
         shuffle=shuffle,
     )
 

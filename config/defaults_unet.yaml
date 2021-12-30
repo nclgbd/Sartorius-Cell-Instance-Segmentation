@@ -26,7 +26,7 @@ beta: [0.9, 0.999]
 mean: [0.485, 0.456, 0.406]
 std: [0.229, 0.224, 0.225]
 image_resize: [224, 224]
-epochs: 1
+epochs: 1000
 
 # Models
 unet:

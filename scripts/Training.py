@@ -209,9 +209,9 @@ def train(model_name, config=None):
         os.environ["WANDB_ENTITY"] = conf["wandb_entity"]
         os.environ["WANDB_RESUME"] = conf["wandb_resume"]
         os.environ["WANDB_RUN_ID"] = conf["wandb_run_id"]
-        os.environ["WANDB_MODE"] = conf["mode"]
-        os.environ["WANDB_JOB_TYPE"] = conf["job_type"]
-        os.environ["WANDB_TAGS"] = conf["tags"]
+        os.environ["WANDB_MODE"] = conf["wandb_mode"]
+        os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
+        os.environ["WANDB_TAGS"] = conf["wandb_tags"]
 
         if config.sweep:
             sweep_cfg = config.sweep_cfg
@@ -239,8 +239,6 @@ def train(model_name, config=None):
                 )
     # local implementation
     else:
-        ds_train = setup(config=config)
-
         _train(
             config=config,
             model_config=model_cfg,

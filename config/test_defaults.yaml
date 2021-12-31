@@ -7,12 +7,10 @@ test_path: "test/"
 train_semi_supervised_path: "train_semi_supervised"
 model_path: "models"
 
-
 # Filenames
 train_csv: "train.csv"
 sweep_path: "sweep.yaml"
 params_path: "test_params.yaml"
-
 
 # Defaults
 log: false

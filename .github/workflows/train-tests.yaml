@@ -1,60 +1,61 @@
 name: test train
 
-on: 
+on:
   push:
     branches:
       - develop-train*
+      - train*
 
 jobs:
   # OFFLINE TESTS
   test-train:
     runs-on: self-hosted
     steps:
-    - uses: actions/checkout@v2
-    - name: Check conda environment
-      shell: bash -l {0}
-      run: bash workflow_scripts/check-conda-env.bash
-    - name: Wandb setup
-      shell: bash -l {0}
-      run: |
-        touch config/.env
-        bash workflow_scripts/wandb-setup.bash
-        echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
+      - uses: actions/checkout@v2
+      - name: Check conda environment
+        shell: bash -l {0}
+        run: bash workflow_scripts/check-conda-env.bash
+      - name: Wandb setup
+        shell: bash -l {0}
+        run: |
+          touch config/.env
+          bash workflow_scripts/wandb-setup.bash
+          echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
 
-    - name: Copying dataset
-      shell: bash -l {0}
-      run: bash scripts.copy-dataset.bash
-    - name: Train
-      shell: bash -l {0}
-      run: |
-        mkdir "models"
-        conda activate skc_env
-        python scripts/train.py --defaults_path config/test_defaults.yaml
+      - name: Copying dataset
+        shell: bash -l {0}
+        run: bash scripts.copy-dataset.bash
+      - name: Train
+        shell: bash -l {0}
+        run: |
+          mkdir "models"
+          conda activate skc_env
+          python scripts/train.py --defaults_path config/test_defaults.yaml
 
   # WANDB IMPLEMENTATION
   test-train-wandb:
     runs-on: self-hosted
     steps:
-    - uses: actions/checkout@v2
-    - name: Check conda environment
-      shell: bash -l {0}
-      run: bash workflow_scripts/check-conda-env.bash
-    - name: Wandb setup
-      shell: bash -l {0}
-      run: |
-        touch config/.env
-        bash workflow_scripts/wandb-setup.bash
-        echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
+      - uses: actions/checkout@v2
+      - name: Check conda environment
+        shell: bash -l {0}
+        run: bash workflow_scripts/check-conda-env.bash
+      - name: Wandb setup
+        shell: bash -l {0}
+        run: |
+          touch config/.env
+          bash workflow_scripts/wandb-setup.bash
+          echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
 
-    - name: Copying dataset
-      shell: bash -l {0}
-      run: bash scripts.copy-dataset.bash
-    - name: Train
-      shell: bash -l {0}
-      run: |
-        mkdir "models"
-        conda activate skc_env
-        python scripts/train.py --defaults_path config/test_defaults_wandb.yaml
+      - name: Copying dataset
+        shell: bash -l {0}
+        run: bash scripts.copy-dataset.bash
+      - name: Train
+        shell: bash -l {0}
+        run: |
+          mkdir "models"
+          conda activate skc_env
+          python scripts/train.py --defaults_path config/test_defaults_wandb.yaml
 
   # SWEEP IMPLEMENTATION
-    # TODO teehee
+  # TODO teehee

@@ -7,6 +7,7 @@ import segmentation_models_pytorch as smp
 
 from pprint import pprint
 from torch import nn, optim
+from segmentation_models_pytorch.utils import losses
 from segmentation_models_pytorch.utils.metrics import IoU
 
 from Losses import MixedLoss
@@ -17,7 +18,7 @@ def configure_params(config, model_cfg):
 
     avail_params = {
         "iou": IoU,
-        "dice_loss": smp.utils.losses.DiceLoss,
+        "dice_loss": losses.DiceLoss,
         "mixed_loss": MixedLoss,
         "adam": optim.Adam,
     }
@@ -34,7 +35,8 @@ def configure_params(config, model_cfg):
                     optimizer = avail_params[n]
                     params[key] = optimizer(params=model_params, **kwargs)
                 elif key == "metrics":
-                    avail_params[n].params[key].append(avail_params[n](**kwargs))
+                    metrics = avail_params[n]
+                    params[key].append(metrics(**kwargs))
                 elif key == "loss":
                     loss = avail_params[n]
                     params[key] = loss(**kwargs)

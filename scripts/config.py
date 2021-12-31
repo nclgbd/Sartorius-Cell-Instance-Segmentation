@@ -3,7 +3,6 @@ import random
 import numpy as np
 import torch
 import yaml
-import segmentation_models_pytorch as smp
 
 from pprint import pprint
 from torch import nn, optim

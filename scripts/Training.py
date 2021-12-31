@@ -9,7 +9,7 @@ from datetime import datetime
 from dotenv import dotenv_values
 from statistics import mean, stdev
 
-from Utilities import EarlyStopping, create_loader, CellDataset
+from Utilities import EarlyStopping, create_loader, CellDataset, reset_wandb_env
 from config import configure_params
 
 
@@ -201,6 +201,7 @@ def train(model_name, config=None):
     ds_train = setup(config=config)
 
     if config.log:
+        reset_wandb_env()
 
         conf = (
             dotenv_values("config/develop.env")
@@ -214,10 +215,10 @@ def train(model_name, config=None):
         os.environ["WANDB_API_KEY"] = conf["wandb_api_key"]
         os.environ["WANDB_ENTITY"] = conf["wandb_entity"]
         os.environ["WANDB_RESUME"] = conf["wandb_resume"]
-        os.environ["WANDB_RUN_ID"] = conf["wandb_run_id"]
         os.environ["WANDB_MODE"] = conf["wandb_mode"]
         os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
         os.environ["WANDB_TAGS"] = conf["wandb_tags"]
+        os.environ["WANDB_RUN_ID"] = wandb.util.generate_id()
 
         # if config.sweep:
         #     sweep_cfg = config.sweep_cfg

@@ -7,37 +7,23 @@ on:
 
 jobs:
   # OFFLINE TESTS
-  test-train-unet:
+  test-train:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v2
     - name: Check conda environment
       shell: bash -l {0}
-      run: |
-        conda info
-        conda env list
-        conda config --show-sources
-        conda config --show
+      run: bash workflow_scripts/check-conda-env.bash
     - name: Wandb setup
       shell: bash -l {0}
       run: |
         touch config/.env
-
-        echo entity=nclgbd >> config/.env
-        echo project=Sartorius-Kaggle-Competition >> config/.env
+        bash workflow_scripts/wandb-setup.bash
         echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
+
     - name: Copying dataset
       shell: bash -l {0}
-      run: |
-        printenv | sort
-
-        echo "Copying `sartorius-cell-instance-segmentation.zip` to current directory..."
-        conda activate skc_env
-        cp ~/datasets/sartorius-cell-instance-segmentation.zip .
-        unzip -o -q sartorius-cell-instance-segmentation.zip -d data
-        rm -rf sartorius-cell-instance-segmentation.zip
-        ls -la data/
-        echo "Moving data complete. Exit code $(echo $?)"
+      run: bash scripts.copy-dataset.bash
     - name: Train
       shell: bash -l {0}
       run: |
@@ -46,45 +32,29 @@ jobs:
         python scripts/train.py --defaults_path config/test_defaults.yaml
 
   # WANDB IMPLEMENTATION
-  test-train-unet-wandb:
+  test-train-wandb:
     runs-on: self-hosted
     steps:
     - uses: actions/checkout@v2
     - name: Check conda environment
       shell: bash -l {0}
-      run: |
-        conda info
-        conda env list
-        conda config --show-sources
-        conda config --show
+      run: bash workflow_scripts/check-conda-env.bash
     - name: Wandb setup
       shell: bash -l {0}
       run: |
         touch config/.env
-
-        echo entity=nclgbd >> config/.env
-        echo project=Sartorius-Kaggle-Competition >> config/.env
+        bash workflow_scripts/wandb-setup.bash
         echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
+
     - name: Copying dataset
       shell: bash -l {0}
-      run: |
-        printenv | sort
-
-        echo "Copying `sartorius-cell-instance-segmentation.zip` to current directory..."
-        conda activate skc_env
-        cp ~/datasets/sartorius-cell-instance-segmentation.zip .
-        unzip -o -q sartorius-cell-instance-segmentation.zip -d data
-        rm -rf sartorius-cell-instance-segmentation.zip
-        ls -la data/
-        echo "Moving data complete. Exit code $(echo $?)"
+      run: bash scripts.copy-dataset.bash
     - name: Train
       shell: bash -l {0}
       run: |
         mkdir "models"
         conda activate skc_env
         python scripts/train.py --defaults_path config/test_defaults_wandb.yaml
-
-
 
   # SWEEP IMPLEMENTATION
     # TODO teehee

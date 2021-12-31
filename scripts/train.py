@@ -21,9 +21,10 @@ def main():
     cfg = Config(
         defaults_path=DEFAULTS_PATH,
     )
-    
+
     print("Loading configuration complete.\n")
-    train(model_name = cfg.model_name, config=cfg)
+    train(model_name=cfg.model_name, config=cfg)
+
 
 if __name__ == "__main__":
     main()

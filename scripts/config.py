@@ -12,7 +12,6 @@ from Losses import MixedLoss
 from Utilities import make_model
 
 
-
 def configure_params(config, model_cfg):
 
     avail_params = {

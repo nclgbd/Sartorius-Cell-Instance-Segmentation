@@ -10,13 +10,18 @@ jobs:
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v2
+      - name: Extract branch name
+        shell: bash -l {0}
+        run: echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"
+        id: extract_branch
       - name: Check conda environment
         shell: bash -l {0}
         run: bash workflow_scripts/check-conda-env.bash
       - name: Wandb setup
         shell: bash -l {0}
-        run: bash workflow_scripts/wandb-setup.bash ${{ secrets.TRAIN_RUN_ID }} ${{ secrets.WANDB_API_KEY }} config/train.env
-
+        run: |
+          branch_name=${{ steps.extract_branch.outputs.branch }}-lab
+          bash workflow_scripts/wandb-setup.bash branch_name ${{ secrets.WANDB_API_KEY }} config/train.env
       - name: Copying dataset
         shell: bash -l {0}
         run: bash workflow_scripts/copy-dataset.bash

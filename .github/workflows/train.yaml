@@ -15,10 +15,7 @@ jobs:
         run: bash workflow_scripts/check-conda-env.bash
       - name: Wandb setup
         shell: bash -l {0}
-        run: |
-          touch config/.env
-          bash workflow_scripts/wandb-setup.bash ${{ secrets.TRAIN_RUN_ID }}
-          echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/train.env
+        run: bash workflow_scripts/wandb-setup.bash ${{ secrets.TRAIN_RUN_ID }} ${{ secrets.WANDB_API_KEY }} config/train.env
 
       - name: Copying dataset
         shell: bash -l {0}

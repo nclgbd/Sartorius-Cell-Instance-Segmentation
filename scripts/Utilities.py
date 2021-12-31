@@ -365,11 +365,10 @@ class EarlyStopping:
         self.artifact: wandb.Artifact
         self.run = run
         self.config = config
-        self.id = run.id if run else config.github_sha[:5]
+        self.id = run.id
+        self.run_name = f"{self.model_name}-{self.id}"
         self.fname = (
-            "".join([self.model_name, f"-{self.id}", ".pth"])
-            if run
-            else self.model_name + ".pth"
+            "".join([self.run_name, ".pth"]) if run else self.model_name + ".pth"
         )
 
         self.path = str(os.path.join(model_dir, self.fname))
@@ -410,16 +409,6 @@ class EarlyStopping:
                 "loss": self.min_loss,
                 "iou": self.max_iou,
             }
-            if self.config.log:
-                wandb.log(self.state_dict)
-
-            if self.config.checkpoint:
-                torch.save(self.state_dict, self.path)
-
-                if self.config.log:
-                    self.artifact = wandb.Artifact("unet", type="model")
-                    self.artifact.add_file(self.path)
-                    self.run.log_artifact(self.artifact)
 
         else:
             self.count += 1
@@ -429,3 +418,11 @@ class EarlyStopping:
     def check_patience(self) -> (bool):
         print(f"Patience: {self.count}/{self.patience}")
         return self.count >= self.patience
+    
+    def save_model(self):
+        if self.config.checkpoint:
+            torch.save(self.state_dict, self.path)
+            if self.config.log:
+                self.artifact = wandb.Artifact(self.run_name, type="model")
+                self.artifact.add_file(self.path)
+                self.run.log_artifact(self.artifact)

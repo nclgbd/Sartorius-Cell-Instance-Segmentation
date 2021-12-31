@@ -95,9 +95,9 @@ def _train(dataset, config=None, model_config=None, run=None):
             train_epoch_iou = train_logs["iou_score"]
             valid_epoch_iou = valid_logs["iou_score"]
 
-            # if config.log:
-            #     wandb.log({"train_logs": train_logs})
-            #     wandb.log({"valid_logs": valid_logs})
+            if config.log:
+                wandb.log({"train_logs": train_logs})
+                wandb.log({"valid_logs": valid_logs})
 
             # Print epoch results
             print(
@@ -119,6 +119,7 @@ def _train(dataset, config=None, model_config=None, run=None):
                 if breakpoint:
                     best_losses.append(early_stopping.min_loss)
                     best_ious.append(early_stopping.max_iou)
+                    early_stopping.save_model()
                     break
 
     # Print all training and validation metrics
@@ -189,6 +190,7 @@ def train(model_name, config=None):
 
         github_sha = os.getenv("GITHUB_SHA")
         config.github_sha = github_sha[:5] if github_sha else None
+        run_id = wandb.util.generate_id()
 
         os.environ["WANDB_API_KEY"] = conf["wandb_api_key"]
         os.environ["WANDB_ENTITY"] = conf["wandb_entity"]
@@ -196,17 +198,19 @@ def train(model_name, config=None):
         os.environ["WANDB_MODE"] = conf["wandb_mode"]
         os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
         os.environ["WANDB_TAGS"] = conf["wandb_tags"]
-        os.environ["WANDB_RUN_ID"] = wandb.util.generate_id()
+        os.environ["WANDB_RUN_ID"] = run_id
 
         # if config.sweep:
         #     sweep_cfg = config.sweep_cfg
         #     sweep_id = wandb.sweep(sweep_cfg, project=conf["wandb_project"])
 
+        run_name = "".join([config.model_name, f"-{run_id}"])
         run = wandb.init(
             project=conf["wandb_project"],
             entity=conf["wandb_entity"],
             config=defaults_cfg,
             reinit=True,
+            name=run_name,
         )
 
         with run:

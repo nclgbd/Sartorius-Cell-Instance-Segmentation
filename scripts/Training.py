@@ -29,10 +29,8 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
 
 
 def _train(dataset, config=None, model_config=None, run=None):
-    total_train_ious = []
-    total_train_losses = []
-    total_valid_ious = []
-    total_valid_losses = []
+    best_losses = []
+    best_ious = []
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_name = config.model_name
@@ -49,8 +47,8 @@ def _train(dataset, config=None, model_config=None, run=None):
         optimizer = kwargs["optimizer"]
         metrics = kwargs["metrics"]
 
-        if config.log:
-            wandb.watch(model, metrics[0], log_graph=True)
+        # if config.log:
+        #     wandb.watch(model, metrics[0], log_graph=True)
 
         # Create loaders
         print(f"\nFold: {idx+1}\n--------")
@@ -97,9 +95,9 @@ def _train(dataset, config=None, model_config=None, run=None):
             train_epoch_iou = train_logs["iou_score"]
             valid_epoch_iou = valid_logs["iou_score"]
 
-            if config.log:
-                wandb.log({"train_logs": train_logs})
-                wandb.log({"valid_logs": valid_logs})
+            # if config.log:
+            #     wandb.log({"train_logs": train_logs})
+            #     wandb.log({"valid_logs": valid_logs})
 
             # Print epoch results
             print(
@@ -108,12 +106,6 @@ def _train(dataset, config=None, model_config=None, run=None):
             print(
                 f"Validation loss: {valid_epoch_loss:.4f}\t Validation iou: {valid_epoch_iou:.4f}"
             )
-
-            total_train_losses.append(train_epoch_loss)
-            total_train_ious.append(train_epoch_iou)
-
-            total_valid_losses.append(valid_epoch_loss)
-            total_valid_ious.append(valid_epoch_iou)
 
             if early_stopping:
                 breakpoint = early_stopping.checkpoint(
@@ -125,49 +117,35 @@ def _train(dataset, config=None, model_config=None, run=None):
                 )
 
                 if breakpoint:
+                    best_losses.append(early_stopping.min_loss)
+                    best_ious.append(early_stopping.max_iou)
                     break
 
     # Print all training and validation metrics
-    train_avg_iou = mean(total_train_ious)
-    train_avg_iou_std = stdev(total_train_ious)
+    if config.checkpoint:
+        avg_iou = mean(best_ious)
+        avg_iou_std = stdev(best_ious)
 
-    train_avg_loss = mean(total_train_losses)
-    train_avg_loss_std = stdev(total_train_losses)
+        avg_loss = mean(best_losses)
+        avg_loss_std = stdev(best_losses)
 
-    valid_avg_iou = mean(total_valid_ious)
-    valid_avg_iou_std = stdev(total_valid_ious)
+        print(
+            f"Average validation iou of all folds:\t{avg_iou:.4f} +/- {avg_iou_std:.4f}"
+        )
+        print(
+            f"Average validation loss of all folds:\t{avg_loss:.4f} +/- {avg_loss_std:.4f}\n\n"
+        )
 
-    valid_avg_loss = mean(total_valid_losses)
-    valid_avg_loss_std = stdev(total_valid_losses)
+        # Log the metrics if using wanb
+        if config.log:
+            avg_metrics = {}
 
-    print(
-        f"\n\nAverage training iou of all folds:\t{train_avg_iou:.4f} +/- {train_avg_iou_std:.4f}"
-    )
-    print(
-        f"Average training loss of all folds:\t{train_avg_loss:.4f} +/- {train_avg_loss_std:.4f}"
-    )
-    print(
-        f"Average validation iou of all folds:\t{valid_avg_iou:.4f} +/- {valid_avg_iou_std:.4f}"
-    )
-    print(
-        f"Average validation loss of all folds:\t{valid_avg_loss:.4f} +/- {valid_avg_loss_std:.4f}\n\n"
-    )
+            avg_metrics["avg_iou"] = avg_iou
+            avg_metrics["avg_iou_std"] = avg_iou_std
+            avg_metrics["avg_loss"] = avg_loss
+            avg_metrics["avg_loss_std"] = avg_loss_std
 
-    # Log the metrics if using wanb
-    if config.log:
-        avg_metrics = {}
-
-        avg_metrics["train_avg_iou"] = train_avg_iou
-        avg_metrics["train_avg_iou_std"] = train_avg_iou_std
-        avg_metrics["train_avg_loss"] = train_avg_loss
-        avg_metrics["train_avg_loss_std"] = train_avg_loss_std
-
-        avg_metrics["valid_avg_iou"] = valid_avg_iou
-        avg_metrics["valid_avg_iou_std"] = valid_avg_iou_std
-        avg_metrics["valid_avg_loss"] = valid_avg_loss
-        avg_metrics["valid_avg_loss_std"] = valid_avg_loss_std
-
-        wandb.log({"avg_metrics": avg_metrics})
+            wandb.log({"avg_metrics": avg_metrics})
 
 
 def setup(config=None):

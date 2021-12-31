@@ -6,6 +6,7 @@ train_path: "train/"
 test_path: "test/"
 train_semi_supervised_path: "train_semi_supervised"
 model_path: "models"
+mode: "develop"
 
 # Filenames
 train_csv: "train.csv"

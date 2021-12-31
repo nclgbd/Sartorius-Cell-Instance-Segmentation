@@ -95,6 +95,7 @@ class Config:
 
             self.seed = self.defaults_cfg["seed"]
             self.model_path = self.defaults_cfg["model_path"]
+            self.mode = self.defaults_cfg["mode"]
             self.kfold = self.defaults_cfg["kfold"]
             self.n_splits = self.defaults_cfg["n_splits"]
             self.count = self.defaults_cfg["count"]

@@ -1,7 +1,7 @@
-echo "wandb_resume=allow >> config/.env
-wandb_run_id=36u8cxrw >> config/.env
-wandb_mode=online >> config/.env
-wandb_job_type=kfold >> config/.env
-wandb_tags=baseline >> config/.env
-wandb_entity=nclgbd >> config/.env
-wandb_project=Sartorius-Kaggle-Competition" >>config/.env
+echo "wandb_resume=allow
+wandb_run_id=$1
+wandb_mode=online
+wandb_job_type=kfold
+wandb_tags=baseline
+wandb_entity=nclgbd
+wandb_project=Sartorius-Kaggle-Competition" >>config/develop.env

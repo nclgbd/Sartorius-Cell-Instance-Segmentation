@@ -201,7 +201,13 @@ def train(model_name, config=None):
     ds_train = setup(config=config)
 
     if config.log:
-        conf = dotenv_values("config/.env")
+
+        conf = (
+            dotenv_values("config/develop.env")
+            if config.mode == "develop"
+            else dotenv_values("config/train.env")
+        )
+        
         github_sha = os.getenv("GITHUB_SHA")
         config.github_sha = github_sha[:5] if github_sha else None
 
@@ -213,13 +219,13 @@ def train(model_name, config=None):
         os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
         os.environ["WANDB_TAGS"] = conf["wandb_tags"]
 
-        if config.sweep:
-            sweep_cfg = config.sweep_cfg
-            sweep_id = wandb.sweep(sweep_cfg, project=conf["project"])
+        # if config.sweep:
+        #     sweep_cfg = config.sweep_cfg
+        #     sweep_id = wandb.sweep(sweep_cfg, project=conf["wandb_project"])
 
         run = wandb.init(
-            project=conf["project"],
-            entity=conf["entity"],
+            project=conf["wandb_project"],
+            entity=conf["wandb_entity"],
             config=defaults_cfg,
             reinit=True,
         )
@@ -228,7 +234,8 @@ def train(model_name, config=None):
             config = wandb.config
             config["model_name"] = model_name
             if config.sweep:
-                wandb.agent(sweep_id, sweep_train, count=config.count)
+                pass
+                # wandb.agent(sweep_id, sweep_train, count=config.count)
 
             else:
                 _train(

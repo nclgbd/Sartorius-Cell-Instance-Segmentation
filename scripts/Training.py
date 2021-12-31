@@ -9,7 +9,7 @@ from datetime import datetime
 from dotenv import dotenv_values
 from statistics import mean, stdev
 
-from Utilities import EarlyStopping, create_loader,  CellDataset
+from Utilities import EarlyStopping, create_loader, CellDataset
 from config import configure_params
 
 
@@ -68,7 +68,6 @@ def _train(dataset, config=None, model_config=None, run=None):
                 loss=criterion,
                 metrics=metrics,
                 optimizer=optimizer,
-                stage_name="Train"
             )
 
             valid_epoch = smp.utils.train.ValidEpoch(
@@ -77,7 +76,6 @@ def _train(dataset, config=None, model_config=None, run=None):
                 verbose=True,
                 metrics=metrics,
                 loss=criterion,
-                stage_name="Test"
             )
 
             train_logs = train_epoch.run(dl_train)

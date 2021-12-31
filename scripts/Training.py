@@ -207,7 +207,7 @@ def train(model_name, config=None):
             if config.mode == "develop"
             else dotenv_values("config/train.env")
         )
-        
+
         github_sha = os.getenv("GITHUB_SHA")
         config.github_sha = github_sha[:5] if github_sha else None
 
@@ -253,4 +253,5 @@ def train(model_name, config=None):
         )
 
     end = datetime.now()
-    print(f"\nTraining complete. Total training time {end-start}.")
+    delta = end - start
+    print(f"\nTraining complete. Total training time {delta}.")

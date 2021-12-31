@@ -15,13 +15,6 @@ jobs:
       - name: Check conda environment
         shell: bash -l {0}
         run: bash workflow_scripts/check-conda-env.bash
-      - name: Wandb setup
-        shell: bash -l {0}
-        run: |
-          touch config/.env
-          bash workflow_scripts/wandb-setup.bash ${{ secrets.DEVELOP_RUN_ID }}
-          echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/develop.env
-
       - name: Copying dataset
         shell: bash -l {0}
         run: bash workflow_scripts/copy-dataset.bash

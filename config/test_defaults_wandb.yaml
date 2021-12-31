@@ -6,7 +6,7 @@ train_path: "train/"
 test_path: "test/"
 train_semi_supervised_path: "train_semi_supervised"
 model_path: "models"
-
+run_id: 
 
 # Filenames
 train_csv: "train.csv"
@@ -16,7 +16,7 @@ params_path: "test_params.yaml"
 
 # Defaults
 log: true
-checkpoint: true
+checkpoint: false
 sweep: false
 kfold: true
 seed: 42

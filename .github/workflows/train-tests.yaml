@@ -24,7 +24,7 @@ jobs:
         touch config/.env
 
         echo entity=nclgbd >> config/.env
-        echo project=Sartorius-Cell-Instance-Segmentation >> config/.env
+        echo project=Sartorius-Kaggle-Competition >> config/.env
         echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
     - name: Copying dataset
       shell: bash -l {0}
@@ -63,7 +63,7 @@ jobs:
         touch config/.env
 
         echo entity=nclgbd >> config/.env
-        echo project=Sartorius-Cell-Instance-Segmentation >> config/.env
+        echo project=Sartorius-Kaggle-Competition >> config/.env
         echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
     - name: Copying dataset
       shell: bash -l {0}

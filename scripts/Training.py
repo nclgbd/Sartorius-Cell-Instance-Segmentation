@@ -202,9 +202,16 @@ def train(model_name, config=None):
 
     if config.log:
         conf = dotenv_values("config/.env")
-        os.environ["WANDB_API_KEY"] = conf["wandb_api_key"]
         github_sha = os.getenv("GITHUB_SHA")
         config.github_sha = github_sha[:5] if github_sha else None
+
+        os.environ["WANDB_API_KEY"] = conf["wandb_api_key"]
+        os.environ["WANDB_ENTITY"] = conf["wandb_entity"]
+        os.environ["WANDB_RESUME"] = conf["wandb_resume"]
+        os.environ["WANDB_RUN_ID"] = conf["wandb_run_id"]
+        os.environ["WANDB_MODE"] = conf["mode"]
+        os.environ["WANDB_JOB_TYPE"] = conf["job_type"]
+        os.environ["WANDB_TAGS"] = conf["tags"]
 
         if config.sweep:
             sweep_cfg = config.sweep_cfg

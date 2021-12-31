@@ -16,12 +16,6 @@ from Utilities import make_model
 
 def configure_params(config, model_cfg):
 
-    avail_params = {
-        "iou": IoU,
-        "dice_loss": losses.DiceLoss,
-        "mixed_loss": MixedLoss,
-        "adam": optim.Adam,
-    }
     model = make_model(config)
     model_params = model.parameters()
     params = {
@@ -32,14 +26,16 @@ def configure_params(config, model_cfg):
         if type(values) == dict:
             for n, kwargs in values.items():
                 if key == "optimizer":
-                    optimizer = avail_params[n]
-                    params[key] = optimizer(params=model_params, **kwargs)
+                    if n == "adam":
+                        params[key] = optim.Adam(params=model_params, **kwargs)
                 elif key == "metrics":
-                    metrics = avail_params[n]
-                    params[key].append(metrics(**kwargs))
+                    if n == "iou":
+                        params[key].append(IoU(**kwargs))
                 elif key == "loss":
-                    loss = avail_params[n]
-                    params[key] = loss(**kwargs)
+                    if n == "dice_loss":
+                        params[key] = losses.DiceLoss(**kwargs)
+                    elif n == "mixed_loss":
+                        params[key] = MixedLoss(**kwargs)
 
     return model, params
 

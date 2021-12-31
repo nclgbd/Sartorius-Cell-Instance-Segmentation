@@ -13,7 +13,6 @@ train_csv: "train.csv"
 sweep_path: "sweep.yaml"
 params_path: "test_params.yaml"
 
-
 # Defaults
 log: true
 checkpoint: false

@@ -15,7 +15,7 @@ params_path: "params_unet.yaml"
 
 # Defaults
 log: true
-checkpoint: false
+checkpoint: true
 sweep: false
 kfold: true
 seed: 42

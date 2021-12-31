@@ -22,7 +22,7 @@ from albumentations import (
     GaussNoise,
 )
 from albumentations.pytorch import ToTensorV2
-from torch.utils.data import Dataset, Subset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from sklearn.model_selection import StratifiedKFold, train_test_split
 

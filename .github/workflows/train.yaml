@@ -1,4 +1,4 @@
-name: train all models
+name: Train unet
 
 on:
   push:

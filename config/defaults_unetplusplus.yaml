@@ -1,21 +1,22 @@
 # Paths
-model_name: unet
+model_name: unetplusplus
 config_path: "config/"
 directory_path: "data/"
-train_path: "train/"
-test_path: "test/"
+train_path: "data/train/"
+test_path: "data/test/"
 train_semi_supervised_path: "train_semi_supervised"
 model_path: "models"
-mode: "develop"
+
 
 # Filenames
-train_csv: "train.csv"
+train_csv: "data/train.csv"
 sweep_path: "sweep.yaml"
-params_path: "test_params.yaml"
+params_path: "params_unetplusplus.yaml"
+
 
 # Defaults
 log: true
-checkpoint: false
+checkpoint: true
 sweep: false
 kfold: true
 seed: 42
@@ -25,7 +26,7 @@ beta: [0.9, 0.999]
 mean: [0.485, 0.456, 0.406]
 std: [0.229, 0.224, 0.225]
 image_resize: [224, 224]
-epochs: 1
+epochs: 1000
 
 # Models
 unet:

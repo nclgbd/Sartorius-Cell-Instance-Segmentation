@@ -22,13 +22,24 @@ from albumentations import (
     GaussNoise,
 )
 from albumentations.pytorch import ToTensorV2
-from torch.utils.data import Dataset, Subset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
 
 CLASS_MAPPING = {0: "shsy5y", 1: "cort", 2: "astro"}
 CLASS_MAPPING_ID = {v: k for k, v in CLASS_MAPPING.items()}
+
+
+def reset_wandb_env():
+    exclude = {
+        "WANDB_PROJECT",
+        "WANDB_ENTITY",
+        "WANDB_API_KEY",
+    }
+    for k, _ in os.environ.items():
+        if k.startswith("WANDB_") and k not in exclude:
+            del os.environ[k]
 
 
 def make_model(config=None, cuda=True):
@@ -228,6 +239,8 @@ class CellDataset(Dataset):
                 Normalize(mean=config.mean, std=config.std, p=1),
                 HorizontalFlip(p=0.5),
                 VerticalFlip(p=0.5),
+                GaussNoise(mean=config.mean),
+                ShiftScaleRotate(),
                 ToTensorV2(),
             ]
         )
@@ -238,6 +251,7 @@ class CellDataset(Dataset):
 
         self.dl_train: DataLoader
         self.dl_valid: DataLoader
+
 
     def __getitem__(self, idx):
         image_id = self.image_ids[idx]
@@ -257,6 +271,7 @@ class CellDataset(Dataset):
 
     def __len__(self):
         return len(self.image_ids)
+
 
     def _split_data(self, n_splits=5):
         # creates folds
@@ -354,11 +369,10 @@ class EarlyStopping:
         self.artifact: wandb.Artifact
         self.run = run
         self.config = config
-        self.id = run.id if run else config.github_sha[:5]
+        self.id = run.id
+        self.run_name = f"{self.model_name}-{self.id}"
         self.fname = (
-            "".join([self.model_name, f"-{self.id}", ".pth"])
-            if run
-            else self.model_name + ".pth"
+            "".join([self.run_name, ".pth"]) if run else self.model_name + ".pth"
         )
 
         self.path = str(os.path.join(model_dir, self.fname))
@@ -399,22 +413,22 @@ class EarlyStopping:
                 "loss": self.min_loss,
                 "iou": self.max_iou,
             }
-            if self.config.log:
-                wandb.log(self.state_dict)
-
-            if self.config.checkpoint:
-                torch.save(self.state_dict, self.path)
-
-                if self.config.log:
-                    self.artifact = wandb.Artifact("unet", type="model")
-                    self.artifact.add_file(self.path)
-                    self.run.log_artifact(self.artifact)
 
         else:
             self.count += 1
 
         return self.check_patience()
 
+
     def check_patience(self) -> (bool):
         print(f"Patience: {self.count}/{self.patience}")
         return self.count >= self.patience
+    
+    
+    def save_model(self):
+        if self.config.checkpoint:
+            torch.save(self.state_dict, self.path)
+            if self.config.log:
+                self.artifact = wandb.Artifact(self.run_name, type="model")
+                self.artifact.add_file(self.path)
+                self.run.log_artifact(self.artifact)

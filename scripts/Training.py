@@ -47,7 +47,7 @@ def _train(dataset, config=None, model_config=None, run=None):
         metrics = kwargs["metrics"]
 
         if config.log:
-            wandb.watch(model, log_graph=True)
+            wandb.watch(model, log="all", log_graph=True)
 
         # Create loaders
         print(f"\nFold: {idx+1}\n--------")

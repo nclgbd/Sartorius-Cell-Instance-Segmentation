@@ -47,7 +47,7 @@ def _train(dataset, config=None, model_config=None, run=None):
         metrics = kwargs["metrics"]
 
         if config.log:
-            wandb.watch(model, log="all", log_graph=True)
+            wandb.watch(model, log_graph=True)
 
         # Create loaders
         print(f"\nFold: {idx+1}\n--------")
@@ -148,7 +148,7 @@ def _train(dataset, config=None, model_config=None, run=None):
             wandb.log({"avg_metrics": avg_metrics})
 
 
-def setup(config=None):
+def create_dataset(config=None):
     print("\nLoading training data...")
     df_train = pd.read_csv(config.train_csv)
     print("Loading training data complete.\n")
@@ -165,18 +165,18 @@ def sweep_train(config=None):
     return
     # run = wandb.run
     # config = config if config else wandb.config
-    # # ds_train, model, params = setup(config=config)
+    # # ds_train, model, params = create_dataset(config=config)
     # # _train(model=model, config=config, run=run, dataset=ds_train, kwargs=params)
 
 
 def train(model_name, config=None):
 
     start = datetime.now()
-    print(f"\nConfiguration setup complete. Training began at {start} ...\n")
+    print(f"\nConfiguration dataset complete. Training began at {start} ...\n")
     time.sleep(2)
     defaults_cfg = config.defaults_cfg
     model_cfg = config.model_cfg
-    ds_train = setup(config=config)
+    ds_train = create_dataset(config=config)
 
     if config.log:
         reset_wandb_env()

@@ -1,13 +1,13 @@
 model_name: unet
 lr: 0.0001
-batch_size: 16
+batch_size: 32
 metrics:
   iou:
     eps: 1
-    threshold: 0.5
+    threshold: 0.3
 loss:
   mixed_loss:
-    alpha: 10
+    alpha: 5
     gamma: 2.0
 optimizer:
   adam:

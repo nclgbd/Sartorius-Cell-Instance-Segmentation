@@ -239,6 +239,8 @@ class CellDataset(Dataset):
                 Normalize(mean=config.mean, std=config.std, p=1),
                 HorizontalFlip(p=0.5),
                 VerticalFlip(p=0.5),
+                GaussNoise(mean=config.mean),
+                ShiftScaleRotate(),
                 ToTensorV2(),
             ]
         )
@@ -249,6 +251,7 @@ class CellDataset(Dataset):
 
         self.dl_train: DataLoader
         self.dl_valid: DataLoader
+
 
     def __getitem__(self, idx):
         image_id = self.image_ids[idx]
@@ -268,6 +271,7 @@ class CellDataset(Dataset):
 
     def __len__(self):
         return len(self.image_ids)
+
 
     def _split_data(self, n_splits=5):
         # creates folds
@@ -415,9 +419,11 @@ class EarlyStopping:
 
         return self.check_patience()
 
+
     def check_patience(self) -> (bool):
         print(f"Patience: {self.count}/{self.patience}")
         return self.count >= self.patience
+    
     
     def save_model(self):
         if self.config.checkpoint:

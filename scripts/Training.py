@@ -42,13 +42,12 @@ def _train(dataset, config=None, model_config=None, run=None):
         )
         model, kwargs = configure_params(config=config, model_cfg=model_config)
 
-        # kwargs = kwargs["kwargs"]
         criterion = kwargs["loss"]
         optimizer = kwargs["optimizer"]
         metrics = kwargs["metrics"]
 
-        # if config.log:
-        #     wandb.watch(model, metrics[0], log_graph=True)
+        if config.log:
+            wandb.watch(model, metrics[0], log_graph=True)
 
         # Create loaders
         print(f"\nFold: {idx+1}\n--------")
@@ -163,11 +162,11 @@ def setup(config=None):
 
 
 def sweep_train(config=None):
-
-    run = wandb.run
-    config = config if config else wandb.config
-    # ds_train, model, params = setup(config=config)
-    # _train(model=model, config=config, run=run, dataset=ds_train, kwargs=params)
+    return
+    # run = wandb.run
+    # config = config if config else wandb.config
+    # # ds_train, model, params = setup(config=config)
+    # # _train(model=model, config=config, run=run, dataset=ds_train, kwargs=params)
 
 
 def train(model_name, config=None):

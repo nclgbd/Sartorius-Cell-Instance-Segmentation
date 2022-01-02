@@ -1,42 +1,40 @@
 import os
 import random
-from statistics import mode
 import numpy as np
 import torch
 import yaml
-import segmentation_models_pytorch as smp
 
 from pprint import pprint
 from torch import nn, optim
-from tqdm import tqdm
+from segmentation_models_pytorch.utils import losses
+from segmentation_models_pytorch.utils.metrics import IoU
 
 from Losses import MixedLoss
 from Utilities import make_model
 
 
-def configure_params(config):
+def configure_params(config, model_cfg):
 
-    avail_params = config.avail_params
     model = make_model(config)
     model_params = model.parameters()
-
-    config.model_params = model_params
-    config.model = model
     params = {
-        "optimizer": None,
-        "loss": None,
-        "metrics": [],
+        "metrics": list(),
     }
 
-    for key, values in list(config.model_cfg.items()):
+    for key, values in list(model_cfg.items()):
         if type(values) == dict:
             for n, kwargs in values.items():
                 if key == "optimizer":
-                    params[key] = avail_params[n](params=model_params, **kwargs)
+                    if n == "adam":
+                        params[key] = optim.Adam(params=model_params, **kwargs)
                 elif key == "metrics":
-                    params[key].append(avail_params[n](**kwargs))
-                else:
-                    params[key] = avail_params[n](**kwargs)
+                    if n == "iou":
+                        params[key].append(IoU(**kwargs))
+                elif key == "loss":
+                    if n == "dice_loss":
+                        params[key] = losses.DiceLoss(**kwargs)
+                    elif n == "mixed_loss":
+                        params[key] = MixedLoss(**kwargs)
 
     return model, params
 
@@ -54,12 +52,6 @@ class Config:
         `defaults_path` : `str`\n
             Path to the default configuration
         """
-        self.avail_params = {
-            "iou": smp.utils.metrics.IoU,
-            "dice_loss": smp.utils.losses.DiceLoss,
-            "mixed_loss": MixedLoss,
-            "adam": optim.Adam,
-        }
 
         with open(defaults_path, "r") as stream:
             self.defaults_cfg = yaml.safe_load(stream)
@@ -98,6 +90,7 @@ class Config:
 
             self.seed = self.defaults_cfg["seed"]
             self.model_path = self.defaults_cfg["model_path"]
+            self.mode = self.defaults_cfg["mode"]
             self.kfold = self.defaults_cfg["kfold"]
             self.n_splits = self.defaults_cfg["n_splits"]
             self.count = self.defaults_cfg["count"]
@@ -107,8 +100,8 @@ class Config:
             self.image_resize = self.defaults_cfg["image_resize"]
 
             # Models
-            self.unet_params = self.defaults_cfg["unet"]
-            self.unetplusplus_params = self.defaults_cfg["unetplusplus"]
+            self.unet = self.defaults_cfg["unet"]
+            self.unetplusplus = self.defaults_cfg["unetplusplus"]
             self.model: nn.Module
 
             self.github_sha = ""
@@ -131,7 +124,6 @@ class Config:
             print("\nSweep configuration path:", {self.sweep_path})
             pprint(self.sweep_cfg)
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.set_seed()
         print("")
 

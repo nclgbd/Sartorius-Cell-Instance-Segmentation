@@ -316,8 +316,8 @@ class CellDataset(Dataset):
                 Normalize(mean=config.mean, std=config.std, p=1),
                 HorizontalFlip(p=0.5),
                 VerticalFlip(p=0.5),
-                GaussNoise(mean=config.mean),
-                ShiftScaleRotate(),
+                # GaussNoise(mean=config.mean),
+                # ShiftScaleRotate(),
                 ToTensorV2(),
             ]
         )

@@ -16,20 +16,17 @@ from Utilities import (
     wandb_setup,
     setup_env,
 )
-from config import configure_params
+from config import Config, configure_params
+
+CONFIG_DEFAULTS = None
 
 
-def _init_train(model_name, config=None, checkpoint=True, run=None):
+def _init_train(model_name, config=None, run=None):
     torch.set_default_tensor_type("torch.cuda.FloatTensor")
-    early_stopping = None
 
-    if checkpoint:
-        if not config:
-            raise ValueError("Cannot employ checkpointing without a configuration file")
-
-        early_stopping = EarlyStopping(
-            model_dir=config.model_path, model_name=model_name, run=run, config=config
-        )
+    early_stopping = EarlyStopping(
+        model_dir=config.model_path, model_name=model_name, run=run, config=config
+    )
 
     return early_stopping
 
@@ -93,12 +90,15 @@ def _train_epoch(
         f"Validation loss: {valid_epoch_loss:.4f}\t Validation iou: {valid_epoch_iou:.4f}"
     )
 
+    return valid_epoch_loss, valid_epoch_iou
+
 
 def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
+    best_losses = []
+    best_ious = []
+
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
-        early_stopping = _init_train(
-            model_name, config=config, checkpoint=config.checkpoint, run=run
-        )
+        early_stopping = _init_train(model_name, config=config, run=run)
         model, kwargs = configure_params(config=config)
 
         criterion = kwargs["criterion"]
@@ -114,8 +114,7 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
         dl_valid = create_loader(dataset, valid_idx, batch_size=config.batch_size)
 
         for epoch in range(1, config.epochs + 1):
-            _train_epoch(
-                early_stopping,
+            loss, iou = _train_epoch(
                 config,
                 epoch,
                 model,
@@ -127,37 +126,38 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
                 device,
             )
 
-            if early_stopping.check_patience():
+            if early_stopping.checkpoint(
+                model, epoch=epoch, loss=loss, iou=iou, optimizer=optimizer
+            ):
                 early_stopping.save_model()
-                return early_stopping.best_loss, early_stopping.best_iou
+                break
+
+        best_losses.append(early_stopping.min_loss)
+        best_ious.append(early_stopping.max_iou)
+
+    return best_losses, best_ious
 
 
 def _train(dataset, run=None, config=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    best_losses = []
-    best_ious = []
     model_name = config.model_name
 
     if config.log:
         with run:
-            best_loss, best_iou = _kfold_train(
-                model_name,
-                config,
-                dataset,
-                run,
-                device,
+            best_losses, best_ious = _kfold_train(
+                model_name=model_name,
+                config=config,
+                dataset=dataset,
+                run=run,
+                device=device,
             )
     else:
-        best_loss, best_iou = _kfold_train(
-            model_name,
-            config,
-            dataset,
-            device,
+        best_losses, best_ious = _kfold_train(
+            model_name=model_name,
+            config=config,
+            dataset=dataset,
+            device=device,
         )
-    best_losses.append(best_loss)
-    best_ious.append(best_iou)
-    best_losses.append(best_loss)
-    best_ious.append(best_iou)
 
     # Print all training and validation metrics
     if config.checkpoint:
@@ -192,11 +192,18 @@ def sweep_train(config=None):
     _train(dataset, run=run, config=config)
 
 
-def train(config=None):
+def train(defaults_path=""):
 
     start = datetime.now()
     print(f"\nConfiguration dataset complete. Training began at {start} ...\n")
     time.sleep(2)
+
+    print(f"\nLoading configuration...")
+    cfg = Config(
+        defaults_path=defaults_path,
+    )
+    setup_env(cfg.mode)
+    print("Loading configuration complete.\n")
 
     # conf = dotenv_values("config/develop.env")
 
@@ -206,18 +213,20 @@ def train(config=None):
     #     else dotenv_values("config/train.env")
     # )
 
-    setup_env(config.mode)
-
-    if config.sweep:
-        defaults_cfg = config.defaults_cfg
-        sweep_cfg = config.sweep_cfg
+    if cfg.sweep:
+        sweep_cfg = cfg.sweep_cfg
         sweep_id = wandb.sweep(sweep_cfg, project="Sartorius-Kaggle-Competition")
         os.environ["WANDB_RUN_GROUP"] = sweep_id
-        wandb.agent(sweep_id, sweep_train, count=config.count)
+        wandb.agent(sweep_id, sweep_train, count=cfg.count)
 
     else:
-        ds_train = create_dataset(config=config)
-        _train(config=config, dataset=ds_train)
+        if cfg.log:
+            config, run = wandb_setup(cfg)
+            ds_train = create_dataset(config=cfg)
+            _train(config=config, run=run, dataset=ds_train)
+        else:
+            ds_train = create_dataset(config=cfg)
+            _train(config=cfg, dataset=ds_train)
 
     end = datetime.now()
     delta = end - start

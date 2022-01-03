@@ -444,8 +444,8 @@ class EarlyStopping:
         self.artifact: wandb.Artifact
         self.run = run
         self.config = config
-        self.id = run.id
-        self.run_name = f"{self.model_name}-{self.id}"
+        self.id = run.id if run else ""
+        self.run_name = f"{self.model_name}-{self.id}" if run else self.model_name
         self.fname = (
             "".join([self.run_name, ".pth"]) if run else self.model_name + ".pth"
         )
@@ -492,9 +492,9 @@ class EarlyStopping:
         else:
             self.count += 1
 
-        return self.check_patience()
+        return self._check_patience()
 
-    def check_patience(self) -> (bool):
+    def _check_patience(self) -> (bool):
         print(f"Patience: {self.count}/{self.patience}")
         return self.count >= self.patience
 

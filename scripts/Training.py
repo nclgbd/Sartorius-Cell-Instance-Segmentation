@@ -202,7 +202,9 @@ def train(defaults_path=""):
     cfg = Config(
         defaults_path=defaults_path,
     )
-    setup_env(cfg.mode)
+
+    if cfg.log:
+        setup_env(cfg.mode)
     print("Loading configuration complete.\n")
 
     # conf = dotenv_values("config/develop.env")

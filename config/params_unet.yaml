@@ -2,10 +2,10 @@ model_name: unet
 metrics:
   iou:
     eps: 1
-    threshold: 0.3
+    threshold: 0.5
 loss:
   mixed_loss:
-    alpha: 5
+    alpha: 10
     gamma: 2.0
 optimizer:
   adam:

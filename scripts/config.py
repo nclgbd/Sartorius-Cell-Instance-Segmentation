@@ -5,38 +5,35 @@ import torch
 import yaml
 
 from pprint import pprint
-from torch import nn, optim
-from segmentation_models_pytorch.utils import losses
-from segmentation_models_pytorch.utils.metrics import IoU
+from torch import nn
 
-from Losses import MixedLoss
-from Utilities import make_model
+from Utilities import make_model, create_criterion, create_optimizer, create_metrics
 
 
-def configure_params(config, model_cfg):
-
+def configure_params(config):
+    # tunable_params = config.tunable_params
     model = make_model(config)
     model_params = model.parameters()
-    params = {
-        "metrics": list(),
+
+    # grab parameter names
+    loss_type = list(config.loss.keys())[0]
+    loss = config.loss[loss_type]
+
+    opt_type = list(config.optimizer.keys())[0]
+    optimizer = config.optimizer[list(config.optimizer.keys())[0]]
+
+    metrics_type = list(config.metrics.keys())[0]
+    metrics = config.metrics[list(config.metrics.keys())[0]]
+
+    criterion = create_criterion(loss_type, **loss)
+    optimizer = create_optimizer(opt_type, model_params, **optimizer)
+    metrics = create_metrics(metrics_type, **metrics)
+
+    return model, {
+        "criterion": criterion,
+        "optimizer": optimizer,
+        "metrics": metrics,
     }
-
-    for key, values in list(model_cfg.items()):
-        if type(values) == dict:
-            for n, kwargs in values.items():
-                if key == "optimizer":
-                    if n == "adam":
-                        params[key] = optim.Adam(params=model_params, **kwargs)
-                elif key == "metrics":
-                    if n == "iou":
-                        params[key].append(IoU(**kwargs))
-                elif key == "loss":
-                    if n == "dice_loss":
-                        params[key] = losses.DiceLoss(**kwargs)
-                    elif n == "mixed_loss":
-                        params[key] = MixedLoss(**kwargs)
-
-    return model, params
 
 
 class Config:
@@ -98,6 +95,7 @@ class Config:
             self.mean = self.defaults_cfg["mean"]
             self.std = self.defaults_cfg["std"]
             self.image_resize = self.defaults_cfg["image_resize"]
+            self.batch_size = self.defaults_cfg["batch_size"]
 
             # Models
             self.unet = self.defaults_cfg["unet"]
@@ -112,12 +110,19 @@ class Config:
             pprint(self.model_cfg)
 
             # self.model_name = self.model_cfg["model_name"]
-            self.lr = self.model_cfg["lr"]
-            self.batch_size = self.model_cfg["batch_size"]
+            # self.lr = self.model_cfg["lr"]
             self.metrics = self.model_cfg["metrics"]
             self.loss = self.model_cfg["loss"]
             self.optimizer = self.model_cfg["optimizer"]
+            self.defaults_cfg.update(self.model_cfg)
             self.model_params = None
+
+            self.tunable_params = [
+                self.batch_size,
+                self.metrics,
+                self.loss,
+                self.optimizer,
+            ]
 
         with open(self.sweep_path, "r") as stream:
             self.sweep_cfg = yaml.safe_load(stream)

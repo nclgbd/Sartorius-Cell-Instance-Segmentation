@@ -1,5 +1,4 @@
 import argparse
-from config import Config
 from Training import train
 
 parser = argparse.ArgumentParser(description="Training script")
@@ -16,15 +15,7 @@ args = parser.parse_args().__dict__
 
 def main():
     DEFAULTS_PATH = args["defaults_path"]
-
-    print(f"\nLoading configuration...")
-    cfg = Config(
-        defaults_path=DEFAULTS_PATH,
-    )
-
-    print("Loading configuration complete.\n")
-    train(model_name=cfg.model_name, config=cfg)
-
+    train(defaults_path=DEFAULTS_PATH)
 
 if __name__ == "__main__":
     main()

@@ -105,8 +105,8 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
         optimizer = kwargs["optimizer"]
         metrics = [kwargs["metrics"]]
 
-        if config.log:
-            wandb.watch(model, log_graph=True)
+        # if config.log:
+        #     wandb.watch(model, log_graph=True)
 
         # Create loaders
         print(f"\nFold: {idx+1}\n--------")

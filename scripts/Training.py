@@ -6,10 +6,16 @@ import time
 import pandas as pd
 
 from datetime import datetime
-from dotenv import dotenv_values
 from statistics import mean, stdev
+from dotenv import dotenv_values
 
-from Utilities import EarlyStopping, create_loader, CellDataset, reset_wandb_env
+from Utilities import (
+    EarlyStopping,
+    create_loader,
+    create_dataset,
+    wandb_setup,
+    setup_env,
+)
 from config import configure_params
 
 
@@ -28,98 +34,130 @@ def _init_train(model_name, config=None, checkpoint=True, run=None):
     return early_stopping
 
 
-def _train(dataset, config=None, model_config=None, run=None):
-    best_losses = []
-    best_ious = []
+def _train_epoch(
+    config,
+    epoch,
+    model,
+    dl_train,
+    dl_valid,
+    optimizer,
+    criterion,
+    metrics,
+    device="cuda",
+):
+    print(f"Epoch {epoch}\n")
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_name = config.model_name
-    # scheduler = None if "scheduler" not in list(kwargs.keys()) else kwargs["scheduler"]
+    train_epoch = smp.utils.train.TrainEpoch(
+        model,
+        device=device,
+        verbose=True,
+        loss=criterion,
+        metrics=metrics,
+        optimizer=optimizer,
+    )
 
+    valid_epoch = smp.utils.train.ValidEpoch(
+        model,
+        device=device,
+        verbose=True,
+        metrics=metrics,
+        loss=criterion,
+    )
+
+    train_logs = train_epoch.run(dl_train)
+    train_logs_str = [f"{k} : {v:.4f}\t" for k, v in train_logs.items()]
+    print("train:", "".join(train_logs_str))
+
+    valid_logs = valid_epoch.run(dl_valid)
+    valid_logs_str = [f"{k} : {v:.4f}\t" for k, v in valid_logs.items()]
+    print("valid:", "".join(valid_logs_str))
+
+    keys = list(train_logs.keys())
+    if "mixed_loss" in keys:
+        train_epoch_loss = train_logs["mixed_loss"]
+        valid_epoch_loss = valid_logs["mixed_loss"]
+    elif "dice_loss" in keys:
+        train_epoch_loss = train_logs["dice_loss"]
+        valid_epoch_loss = valid_logs["dice_loss"]
+
+    train_epoch_iou = train_logs["iou_score"]
+    valid_epoch_iou = valid_logs["iou_score"]
+
+    if config.log:
+        wandb.log({"train_logs": train_logs})
+        wandb.log({"valid_logs": valid_logs})
+
+    # Print epoch results
+    print(f"\nTrain loss: {train_epoch_loss:.4f}\t Train iou: {train_epoch_iou:.4f}")
+    print(
+        f"Validation loss: {valid_epoch_loss:.4f}\t Validation iou: {valid_epoch_iou:.4f}"
+    )
+
+
+def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
         early_stopping = _init_train(
             model_name, config=config, checkpoint=config.checkpoint, run=run
         )
-        model, kwargs = configure_params(config=config, model_cfg=model_config)
+        model, kwargs = configure_params(config=config)
 
-        criterion = kwargs["loss"]
+        criterion = kwargs["criterion"]
         optimizer = kwargs["optimizer"]
-        metrics = kwargs["metrics"]
+        metrics = [kwargs["metrics"]]
 
         if config.log:
             wandb.watch(model, log="all", log_graph=True)
 
         # Create loaders
         print(f"\nFold: {idx+1}\n--------")
-        dl_train = create_loader(dataset, train_idx, config=model_config)
-        dl_valid = create_loader(dataset, valid_idx, config=model_config)
+        dl_train = create_loader(dataset, train_idx, batch_size=config.batch_size)
+        dl_valid = create_loader(dataset, valid_idx, batch_size=config.batch_size)
 
         for epoch in range(1, config.epochs + 1):
-            print(f"Epoch {epoch}")
-            print()
-
-            train_epoch = smp.utils.train.TrainEpoch(
+            _train_epoch(
+                early_stopping,
+                config,
+                epoch,
                 model,
-                device=device,
-                verbose=True,
-                loss=criterion,
-                metrics=metrics,
-                optimizer=optimizer,
+                dl_train,
+                dl_valid,
+                optimizer,
+                criterion,
+                metrics,
+                device,
             )
 
-            valid_epoch = smp.utils.train.ValidEpoch(
-                model,
-                device=device,
-                verbose=True,
-                metrics=metrics,
-                loss=criterion,
+            if early_stopping.check_patience():
+                early_stopping.save_model()
+                return early_stopping.best_loss, early_stopping.best_iou
+
+
+def _train(dataset, run=None, config=None):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    best_losses = []
+    best_ious = []
+    model_name = config.model_name
+
+    if config.log:
+        with run:
+            best_loss, best_iou = _kfold_train(
+                model_name,
+                config,
+                dataset,
+                run,
+                device,
             )
-
-            train_logs = train_epoch.run(dl_train)
-            train_logs_str = [f"{k} : {v:.4f}\t" for k, v in train_logs.items()]
-            print("train:", "".join(train_logs_str))
-
-            valid_logs = valid_epoch.run(dl_valid)
-            valid_logs_str = [f"{k} : {v:.4f}\t" for k, v in valid_logs.items()]
-            print("valid:", "".join(valid_logs_str))
-
-            keys = list(train_logs.keys())
-            if "mixed_loss" in keys:
-                train_epoch_loss = train_logs["mixed_loss"]
-                valid_epoch_loss = valid_logs["mixed_loss"]
-            elif "dice_loss" in keys:
-                train_epoch_loss = train_logs["dice_loss"]
-                valid_epoch_loss = valid_logs["dice_loss"]
-
-            train_epoch_iou = train_logs["iou_score"]
-            valid_epoch_iou = valid_logs["iou_score"]
-
-            if config.log:
-                wandb.log({"train_logs": train_logs})
-                wandb.log({"valid_logs": valid_logs})
-
-            # Print epoch results
-            print(
-                f"\nTrain loss: {train_epoch_loss:.4f}\t Train iou: {train_epoch_iou:.4f}"
-            )
-            print(
-                f"Validation loss: {valid_epoch_loss:.4f}\t Validation iou: {valid_epoch_iou:.4f}"
-            )
-
-            if early_stopping:
-                breakpoint = early_stopping.checkpoint(
-                    model,
-                    epoch=epoch,
-                    loss=valid_epoch_loss,
-                    iou=valid_epoch_iou,
-                    optimizer=optimizer,
-                )
-
-                if breakpoint:
-                    best_losses.append(early_stopping.min_loss)
-                    best_ious.append(early_stopping.max_iou)
-                    early_stopping.save_model()
-                    break
+    else:
+        best_loss, best_iou = _kfold_train(
+            model_name,
+            config,
+            dataset,
+            device,
+        )
+    best_losses.append(best_loss)
+    best_ious.append(best_iou)
+    best_losses.append(best_loss)
+    best_ious.append(best_iou)
 
     # Print all training and validation metrics
     if config.checkpoint:
@@ -148,91 +186,38 @@ def _train(dataset, config=None, model_config=None, run=None):
             wandb.log({"avg_metrics": avg_metrics})
 
 
-def setup(config=None):
-    print("\nLoading training data...")
-    df_train = pd.read_csv(config.train_csv)
-    print("Loading training data complete.\n")
-    print(df_train.info())
-
-    print("\nConfiguring data...")
-    ds_train = CellDataset(df_train, config=config)
-    print("Configuring data complete.\n")
-
-    return ds_train
-
-
 def sweep_train(config=None):
-    return
-    # run = wandb.run
-    # config = config if config else wandb.config
-    # # ds_train, model, params = setup(config=config)
-    # # _train(model=model, config=config, run=run, dataset=ds_train, kwargs=params)
+    config, run = wandb_setup(config)
+    dataset = create_dataset(config=config)
+    _train(dataset, run=run, config=config)
 
 
-def train(model_name, config=None):
+def train(config=None):
 
     start = datetime.now()
-    print(f"\nConfiguration setup complete. Training began at {start} ...\n")
+    print(f"\nConfiguration dataset complete. Training began at {start} ...\n")
     time.sleep(2)
-    defaults_cfg = config.defaults_cfg
-    model_cfg = config.model_cfg
-    ds_train = setup(config=config)
 
-    if config.log:
-        reset_wandb_env()
+    # conf = dotenv_values("config/develop.env")
 
-        conf = (
-            dotenv_values("config/develop.env")
-            if config.mode == "develop"
-            else dotenv_values("config/train.env")
-        )
+    # conf = (
+    #     dotenv_values("config/develop.env")
+    #     if config.mode == "develop"
+    #     else dotenv_values("config/train.env")
+    # )
 
-        github_sha = os.getenv("GITHUB_SHA")
-        config.github_sha = github_sha[:5] if github_sha else None
-        run_id = wandb.util.generate_id()
+    setup_env(config.mode)
 
-        os.environ["WANDB_API_KEY"] = conf["wandb_api_key"]
-        os.environ["WANDB_ENTITY"] = conf["wandb_entity"]
-        os.environ["WANDB_RESUME"] = conf["wandb_resume"]
-        os.environ["WANDB_MODE"] = conf["wandb_mode"]
-        os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
-        os.environ["WANDB_TAGS"] = conf["wandb_tags"]
-        os.environ["WANDB_RUN_ID"] = run_id
+    if config.sweep:
+        defaults_cfg = config.defaults_cfg
+        sweep_cfg = config.sweep_cfg
+        sweep_id = wandb.sweep(sweep_cfg, project="Sartorius-Kaggle-Competition")
+        os.environ["WANDB_RUN_GROUP"] = sweep_id
+        wandb.agent(sweep_id, sweep_train, count=config.count)
 
-        # if config.sweep:
-        #     sweep_cfg = config.sweep_cfg
-        #     sweep_id = wandb.sweep(sweep_cfg, project=conf["wandb_project"])
-
-        run_name = "".join([config.model_name, f"-{run_id}"])
-        run = wandb.init(
-            project=conf["wandb_project"],
-            entity=conf["wandb_entity"],
-            config=defaults_cfg,
-            reinit=True,
-            name=run_name,
-        )
-
-        with run:
-            config = wandb.config
-            config["model_name"] = model_name
-            if config.sweep:
-                pass
-                # wandb.agent(sweep_id, sweep_train, count=config.count)
-
-            else:
-                _train(
-                    config=config,
-                    model_config=model_cfg,
-                    dataset=ds_train,
-                    run=run,
-                )
-    # local implementation
     else:
-        _train(
-            config=config,
-            model_config=model_cfg,
-            dataset=ds_train,
-        )
+        ds_train = create_dataset(config=config)
+        _train(config=config, dataset=ds_train)
 
     end = datetime.now()
     delta = end - start

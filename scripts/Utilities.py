@@ -9,8 +9,13 @@ import wandb
 import torch
 import segmentation_models_pytorch as smp
 
+from dotenv import dotenv_values
 from pprint import pprint
-from torch import nn
+from torch import nn, optim
+from segmentation_models_pytorch.utils import losses
+from segmentation_models_pytorch.utils.metrics import IoU
+
+from Losses import MixedLoss
 
 from albumentations import (
     HorizontalFlip,
@@ -31,6 +36,39 @@ CLASS_MAPPING = {0: "shsy5y", 1: "cort", 2: "astro"}
 CLASS_MAPPING_ID = {v: k for k, v in CLASS_MAPPING.items()}
 
 
+def setup_env(mode):
+    conf = (
+        dotenv_values("config/develop.env")
+        if mode == "develop"
+        else dotenv_values("config/train.env")
+    )
+
+    os.environ["WANDB_API_KEY"] = conf["wandb_api_key"]
+    os.environ["WANDB_ENTITY"] = conf["wandb_entity"]
+    os.environ["WANDB_RESUME"] = conf["wandb_resume"]
+    os.environ["WANDB_MODE"] = conf["wandb_mode"]
+    os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
+    os.environ["WANDB_TAGS"] = conf["wandb_tags"]
+
+
+def wandb_setup(config=None):
+    reset_wandb_env()
+
+    run_id = wandb.util.generate_id()
+    os.environ["WANDB_RUN_ID"] = run_id
+
+    run_name = "".join(["unet", f"-{run_id}"])
+    run = wandb.init(
+        project="Sartorius-Kaggle-Competition",
+        entity="nclgbd",
+        config=config,
+        reinit=True,
+        name=run_name,
+    )
+
+    return wandb.config, run
+
+
 def reset_wandb_env():
     exclude = {
         "WANDB_PROJECT",
@@ -42,6 +80,29 @@ def reset_wandb_env():
             del os.environ[k]
 
 
+def create_optimizer(optimizer, model_params, **kwargs):
+    if optimizer == "adam":
+        return optim.Adam(params=model_params, **kwargs)
+    else:
+        raise ValueError(f"No corresponding `{optimizer}` type")
+
+
+def create_criterion(loss, **kwargs):
+    if loss == "mixed_loss":
+        return MixedLoss(**kwargs)
+    elif loss == "dice_loss":
+        return losses.DiceLoss(**kwargs)
+    else:
+        raise ValueError(f"No corresponding `{loss}` type")
+
+
+def create_metrics(metrics, **kwargs):
+    if metrics == "iou":
+        return IoU(**kwargs)
+    else:
+        raise ValueError(f"No corresponding `{metrics}` type")
+
+
 def make_model(config=None, cuda=True):
     model: nn.Module
     model_name = config.model_name
@@ -51,21 +112,37 @@ def make_model(config=None, cuda=True):
     elif model_name == "unetplusplus":
         kwargs = config.unetplusplus
         model = smp.UnetPlusPlus(**kwargs)
+    else:
+        raise ValueError(f"`{model_name}` model not recognized")
 
     if cuda:
         model.cuda()
     return model
 
 
-def create_loader(dataset: Dataset, idx, config=None, shuffle=False):
+def create_loader(dataset: Dataset, idx, batch_size, shuffle=False):
     ds = torch.utils.data.Subset(dataset, idx)
     loader = DataLoader(
         ds,
-        batch_size=config["batch_size"],
+        batch_size=batch_size,
         shuffle=shuffle,
     )
 
     return loader
+
+
+def create_dataset(config=None):
+    print("\nLoading training data...")
+    # df_train = pd.read_csv(config.train_csv)
+    df_train = pd.read_csv("data/train.csv")
+    print("Loading training data complete.\n")
+    print(df_train.info())
+
+    print("\nConfiguring data...")
+    ds_train = CellDataset(df_train, config=config)
+    print("Configuring data complete.\n")
+
+    return ds_train
 
 
 def display_dataset(img_paths, rows=2, cols=10):
@@ -252,7 +329,6 @@ class CellDataset(Dataset):
         self.dl_train: DataLoader
         self.dl_valid: DataLoader
 
-
     def __getitem__(self, idx):
         image_id = self.image_ids[idx]
         df = self.gb.get_group(image_id)
@@ -271,7 +347,6 @@ class CellDataset(Dataset):
 
     def __len__(self):
         return len(self.image_ids)
-
 
     def _split_data(self, n_splits=5):
         # creates folds
@@ -419,12 +494,10 @@ class EarlyStopping:
 
         return self.check_patience()
 
-
     def check_patience(self) -> (bool):
         print(f"Patience: {self.count}/{self.patience}")
         return self.count >= self.patience
-    
-    
+
     def save_model(self):
         if self.config.checkpoint:
             torch.save(self.state_dict, self.path)

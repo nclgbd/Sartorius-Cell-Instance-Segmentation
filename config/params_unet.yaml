@@ -1,6 +1,4 @@
 model_name: unet
-lr: 0.0001
-batch_size: 32
 metrics:
   iou:
     eps: 1
@@ -12,3 +10,4 @@ loss:
 optimizer:
   adam:
     eps: 1
+    lr: 0.0001

@@ -30,7 +30,7 @@ epochs: 1000
 
 # Models
 unet:
-  encoder_name: "resnet34"
+  encoder_name: "xception"
   encoder_depth: 5
   encoder_weights: "imagenet"
   decoder_channels: [256, 128, 64, 32, 16]

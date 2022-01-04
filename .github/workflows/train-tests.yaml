@@ -1,86 +1,51 @@
 name: Test train
 
-on: 
+on:
   push:
     branches:
-      - develop-train
+      - develop-train*
+      - train*
 
 jobs:
-  test-train-unet:
+  # OFFLINE TESTS
+  test-train:
     runs-on: self-hosted
     steps:
-    - uses: actions/checkout@v2
-    - name: Check conda environment
-      shell: bash -l {0}
-      run: |
-        conda info
-        conda env list
-        conda config --show-sources
-        conda config --show
-    - name: Wandb setup
-      shell: bash -l {0}
-      run: |
-        touch config/.env
+      - uses: actions/checkout@v2
+      - name: Check conda environment
+        shell: bash -l {0}
+        run: bash workflow_scripts/check-conda-env.bash
+      - name: Copying dataset
+        shell: bash -l {0}
+        run: bash workflow_scripts/copy-dataset.bash
+      - name: Train
+        shell: bash -l {0}
+        run: |
+          mkdir "models"
+          conda activate skc_env
+          python scripts/train.py --defaults_path config/test_defaults.yaml
 
-        echo entity=nclgbd >> config/.env
-        echo project=Sartorius-Cell-Instance-Segmentation >> config/.env
-        echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
-    - name: Copying dataset
-      shell: bash -l {0}
-      run: |
-        export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
-        export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
-        printenv | sort
-
-        echo "Copying `sartorius-cell-instance-segmentation.zip` to current directory..."
-        conda activate skc_env
-        cp ~/datasets/sartorius-cell-instance-segmentation.zip .
-        unzip -o -q sartorius-cell-instance-segmentation.zip -d data
-        rm -rf sartorius-cell-instance-segmentation.zip
-        ls -la data/
-        echo "Moving data complete. Exit code $(echo $?)"
-    - name: Train
-      shell: bash -l {0}
-      run: |
-        mkdir "models"
-        conda activate skc_env
-        python scripts/train.py --model_name=unet --log=False --params_path=config/test_params.yaml --checkpoint=False --sweep=False
-  test-train-unetplusplus:
+  # WANDB IMPLEMENTATION
+  test-train-wandb:
     runs-on: self-hosted
     steps:
-    - uses: actions/checkout@v2
-    - name: Check conda environment
-      shell: bash -l {0}
-      run: |
-        conda info
-        conda env list
-        conda config --show-sources
-        conda config --show
-    - name: Wandb setup
-      shell: bash -l {0}
-      run: |
-        touch config/.env
+      - uses: actions/checkout@v2
+      - name: Check conda environment
+        shell: bash -l {0}
+        run: bash workflow_scripts/check-conda-env.bash
+      - name: Wandb setup
+        shell: bash -l {0}
+        run: bash workflow_scripts/wandb-setup.bash develop-train-lab ${{ secrets.WANDB_API_KEY }} config/develop.env
 
-        echo entity=nclgbd >> config/.env
-        echo project=Sartorius-Cell-Instance-Segmentation >> config/.env
-        echo wandb_api_key=${{ secrets.WANDB_API_KEY }} >> config/.env
-    - name: Copying dataset
-      shell: bash -l {0}
-      run: |
-        export KAGGLE_USERNAME=${{ secrets.KAGGLE_USERNAME }}
-        export KAGGLE_KEY=${{ secrets.KAGGLE_API_KEY }}
-        printenv | sort
+      - name: Copying dataset
+        shell: bash -l {0}
+        run: bash workflow_scripts/copy-dataset.bash
+      - name: Train
+        shell: bash -l {0}
+        run: |
+          mkdir "models"
+          conda activate skc_env
+          python scripts/train.py --defaults_path config/test_defaults_wandb.yaml
 
-        echo "Copying `sartorius-cell-instance-segmentation.zip` to current directory..."
-        conda activate skc_env
-        cp ~/datasets/sartorius-cell-instance-segmentation.zip .
-        unzip -o -q sartorius-cell-instance-segmentation.zip -d data
-        rm -rf sartorius-cell-instance-segmentation.zip
-        ls -la data/
-        echo "Moving data complete. Exit code $(echo $?)"
-    - name: Train
-      shell: bash -l {0}
-      run: |
-        mkdir "models"
-        conda activate skc_env
-        python scripts/train.py --model_name=unetplusplus --log=False --params_path=config/test_params.yaml --checkpoint=False --sweep=False
+  # SWEEP IMPLEMENTATION
+  # TODO teehee

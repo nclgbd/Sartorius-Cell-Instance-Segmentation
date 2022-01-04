@@ -8,6 +8,7 @@ import pandas as pd
 from datetime import datetime
 from statistics import mean, stdev
 from dotenv import dotenv_values
+from torch import optim
 
 from Utilities import (
     EarlyStopping,
@@ -33,16 +34,15 @@ def _init_train(model_name, config=None, run=None):
 
 def _train_epoch(
     config,
-    epoch,
     model,
     dl_train,
     dl_valid,
     optimizer,
     criterion,
     metrics,
+    scheduler=None,
     device="cuda",
 ):
-    print(f"Epoch {epoch}\n")
 
     train_epoch = smp.utils.train.TrainEpoch(
         model,
@@ -89,6 +89,8 @@ def _train_epoch(
     print(
         f"Validation loss: {valid_epoch_loss:.4f}\t Validation iou: {valid_epoch_iou:.4f}"
     )
+    if scheduler:
+        scheduler.step(valid_epoch_loss)
 
     return valid_epoch_loss, valid_epoch_iou
 
@@ -104,25 +106,29 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
         criterion = kwargs["criterion"]
         optimizer = kwargs["optimizer"]
         metrics = [kwargs["metrics"]]
+        lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer=optimizer, mode="min", verbose=True, patience=3
+        )
 
         if config.log:
             wandb.watch(model, log="all", log_graph=True)
 
         # Create loaders
-        print(f"\nFold: {idx+1}\n--------")
+        print(f"\nFold: {idx+1}\n-------")
         dl_train = create_loader(dataset, train_idx, batch_size=config.batch_size)
         dl_valid = create_loader(dataset, valid_idx, batch_size=config.batch_size)
 
         for epoch in range(1, config.epochs + 1):
+            print(f"Epoch {epoch}\n")
             loss, iou = _train_epoch(
                 config,
-                epoch,
                 model,
                 dl_train,
                 dl_valid,
                 optimizer,
                 criterion,
                 metrics,
+                lr_scheduler,
                 device,
             )
 

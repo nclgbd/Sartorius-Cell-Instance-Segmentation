@@ -18,6 +18,7 @@ from Utilities import (
     setup_env,
 )
 from config import Config, configure_params
+from Utilities import wandb_log_masks
 
 CONFIG_DEFAULTS = None
 
@@ -100,6 +101,7 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
     best_ious = []
 
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
+        fold_idx = idx + 1
         early_stopping = _init_train(model_name, config=config, run=run)
         model, kwargs = configure_params(config=config)
 
@@ -114,8 +116,10 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
             wandb.watch(model, log_graph=True)
 
         # Create loaders
-        print(f"\nFold: {idx+1}\n-------")
+        print(f"\nFold: {fold_idx}\n-------")
+        dataset.set_train(True)
         dl_train = create_loader(dataset, train_idx, batch_size=config.batch_size)
+        dataset.set_train(False)
         dl_valid = create_loader(dataset, valid_idx, batch_size=config.batch_size)
 
         for epoch in range(1, config.epochs + 1):
@@ -137,6 +141,12 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
             ):
                 early_stopping.save_model()
                 break
+
+        if config.log:
+            fold_name = early_stopping.run_name + f"_{fold_idx}"
+            wandb_log_masks(
+                fold_name=fold_name, model=model, loader=dl_valid, device=device
+            )
 
         best_losses.append(early_stopping.min_loss)
         best_ious.append(early_stopping.max_iou)

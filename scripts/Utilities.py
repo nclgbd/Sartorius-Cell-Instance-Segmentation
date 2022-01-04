@@ -9,8 +9,10 @@ import wandb
 import torch
 import segmentation_models_pytorch as smp
 
+from torchvision import transforms
 from dotenv import dotenv_values
 from pprint import pprint
+from PIL import Image
 from torch import nn, optim
 from segmentation_models_pytorch.utils import losses
 from segmentation_models_pytorch.utils.metrics import IoU
@@ -25,6 +27,8 @@ from albumentations import (
     Resize,
     Compose,
     GaussNoise,
+    RGBShift,
+    RandomBrightnessContrast,
 )
 from albumentations.pytorch import ToTensorV2
 from torch.utils.data import Dataset, DataLoader
@@ -36,6 +40,7 @@ CLASS_MAPPING = {0: "shsy5y", 1: "cort", 2: "astro"}
 CLASS_MAPPING_ID = {v: k for k, v in CLASS_MAPPING.items()}
 
 
+## WANDB
 def setup_env(mode):
     conf = (
         dotenv_values("config/develop.env")
@@ -80,6 +85,7 @@ def reset_wandb_env():
             del os.environ[k]
 
 
+# CREATING MODELS AND FEATURES
 def create_optimizer(optimizer, model_params, **kwargs):
     if optimizer == "adam":
         return optim.Adam(params=model_params, **kwargs)
@@ -120,7 +126,7 @@ def make_model(config=None, cuda=True):
     return model
 
 
-def create_loader(dataset: Dataset, idx, batch_size, shuffle=False):
+def create_loader(dataset: Dataset, idx, batch_size, shuffle=True):
     ds = torch.utils.data.Subset(dataset, idx)
     loader = DataLoader(
         ds,
@@ -133,7 +139,6 @@ def create_loader(dataset: Dataset, idx, batch_size, shuffle=False):
 
 def create_dataset(config=None):
     print("\nLoading training data...")
-    # df_train = pd.read_csv(config.train_csv)
     df_train = pd.read_csv("data/train.csv")
     print("Loading training data complete.\n")
     print(df_train.info())
@@ -145,6 +150,7 @@ def create_dataset(config=None):
     return ds_train
 
 
+# VISUALIZATIONS
 def display_dataset(img_paths, rows=2, cols=10):
     """
     Function to Display Images from Dataset.
@@ -184,7 +190,7 @@ def im_convert(tensor, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         Returns ndarry de-normalizazed representation of an image.
     """
 
-    image = tensor.clone().detach().numpy()
+    image = tensor.clone().squeeze(0).cpu().numpy()
     image = image.transpose(1, 2, 0)
     image = image * np.array(std) + np.array(mean)  # [0, 1] -> [0, 255]
     image = image.clip(0, 1)
@@ -276,13 +282,43 @@ def plot_masks(image_id, df_train, config=None, colors=True):
 
 
 # Note the use of wandb.Image
-def wandb_mask(bg_img, gt_mask):
+def wandb_mask(bg_img, gt_mask, pred_mask):
     return wandb.Image(
         bg_img,
-        masks={"ground_truth": {"mask_data": gt_mask, "class_labels": CLASS_MAPPING}},
+        masks={
+            "ground_truth": {"mask_data": gt_mask, "class_labels": CLASS_MAPPING},
+            "prediction": {"mask_data": pred_mask, "class_labels": CLASS_MAPPING},
+        },
     )
 
 
+def wandb_log_masks(
+    model: nn.Module, loader: DataLoader, fold_name: str, device="cuda"
+):
+    model = model.eval()
+    mask_imgs = []
+    with torch.no_grad():
+        # only log a batch size of images, for memory reasons
+        iter_ = iter(loader)
+        images, masks = next(iter_)
+        images, masks = images.to(device), masks.to(device)
+        pred_masks = model(images)
+        pred_masks = nn.functional.softmax(pred_masks, dim=1)
+
+        for image, mask, pred_mask in tqdm(
+            list(zip(images, masks, pred_masks)), desc="Uploading masks"
+        ):
+            image = im_convert(image)  # .squeeze(0).cpu().numpy().transpose(1, 2, 0)
+            image = np.uint8(image * 255)
+            image = Image.fromarray(image).convert("RGB")
+            mask = mask.squeeze(0).cpu().numpy()
+            pred_mask = pred_mask.squeeze(0).cpu().numpy()
+            mask_imgs.append(wandb_mask(image, mask, pred_mask))
+
+        wandb.log({fold_name: mask_imgs})
+
+
+# CLASSES
 class CellDataset(Dataset):
     def __init__(self, df: pd.DataFrame, config=None):
         """
@@ -314,10 +350,22 @@ class CellDataset(Dataset):
             [
                 Resize(config.image_resize[0], config.image_resize[1]),
                 Normalize(mean=config.mean, std=config.std, p=1),
+                # RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
                 HorizontalFlip(p=0.5),
                 VerticalFlip(p=0.5),
+                RandomBrightnessContrast(
+                    brightness_limit=0.2, contrast_limit=0.2, p=0.5
+                ),
                 GaussNoise(mean=config.mean),
                 ShiftScaleRotate(),
+                ToTensorV2(),
+            ]
+        )
+
+        self.test_transforms = Compose(
+            [
+                Resize(config.image_resize[0], config.image_resize[1]),
+                Normalize(mean=config.mean, std=config.std, p=1),
                 ToTensorV2(),
             ]
         )
@@ -329,16 +377,21 @@ class CellDataset(Dataset):
         self.dl_train: DataLoader
         self.dl_valid: DataLoader
 
+        self.train = True
+
     def __getitem__(self, idx):
         image_id = self.image_ids[idx]
         df = self.gb.get_group(image_id)
         annotations = df["annotation"].tolist()
         img_path = os.path.join(self.train_path, image_id + ".png")
-        # img_path = df["img_path"].loc[image_id]
         image = cv2.imread(img_path)
         mask = build_masks(self.df, image_id, input_shape=(520, 704))
         mask = (mask >= 1).astype("float32")
-        augmented = self.transforms(image=image, mask=mask)
+        augmented = (
+            self.transforms(image=image, mask=mask)
+            if self.train
+            else self.test_transforms(image=image, mask=mask)
+        )
         image = augmented["image"]
         mask = augmented["mask"]
         return image, mask.reshape(
@@ -377,6 +430,9 @@ class CellDataset(Dataset):
                     X, y.argmax(1), test_size=test_size, random_state=self.config.seed
                 )
             )
+
+    def set_train(self, train=True):
+        self.train = train
 
 
 class EarlyStopping:

@@ -35,7 +35,7 @@ unet:
   encoder_weights: "imagenet"
   decoder_channels: [256, 128, 64, 32, 16]
   in_channels: 1
-  classes: 3
+  classes: 1
   activation: "sigmoid"
   aux_params: null
 

@@ -303,7 +303,7 @@ def wandb_log_masks(
         images, masks = next(iter_)
         images, masks = images.to(device), masks.to(device)
         pred_masks = model(images)
-        # pred_masks = nn.functional.softmax(pred_masks, dim=1)
+        pred_masks = torch.sigmoid(pred_masks)
 
         for image, mask, pred_mask in tqdm(
             list(zip(images, masks, pred_masks)), desc="Uploading masks"

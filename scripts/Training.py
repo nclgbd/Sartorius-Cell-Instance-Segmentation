@@ -113,7 +113,7 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
         )
 
         if config.log:
-            wandb.watch(model, log="all", log_graph=True)
+            wandb.watch(model, log_graph=True)
 
         # Create loaders
         print(f"\nFold: {fold_idx}\n-------")

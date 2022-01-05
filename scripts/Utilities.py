@@ -353,9 +353,6 @@ class CellDataset(Dataset):
                 # RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
                 HorizontalFlip(p=0.5),
                 VerticalFlip(p=0.5),
-                RandomBrightnessContrast(
-                    brightness_limit=0.2, contrast_limit=0.2, p=0.5
-                ),
                 GaussNoise(mean=config.mean),
                 ShiftScaleRotate(),
                 ToTensorV2(),

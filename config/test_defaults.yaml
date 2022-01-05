@@ -36,7 +36,7 @@ unet:
   decoder_channels: [256, 128, 64, 32, 16]
   in_channels: 3
   classes: 1
-  activation: "sigmoid"
+  activation: null
   aux_params: null
 
 unetplusplus:
@@ -48,5 +48,5 @@ unetplusplus:
   decoder_attention_type: None
   in_channels: 3
   classes: 1
-  activation: "sigmoid"
+  activation: null
   aux_params: null

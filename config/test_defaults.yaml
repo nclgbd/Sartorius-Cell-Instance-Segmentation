@@ -34,9 +34,9 @@ unet:
   encoder_depth: 5
   encoder_weights: "imagenet"
   decoder_channels: [256, 128, 64, 32, 16]
-  in_channels: 3
-  classes: 1
-  activation: null
+  in_channels: 1
+  classes: 3
+  activation: "sigmoid"
   aux_params: null
 
 unetplusplus:
@@ -48,5 +48,5 @@ unetplusplus:
   decoder_attention_type: None
   in_channels: 3
   classes: 1
-  activation: null
+  activation: "sigmoid"
   aux_params: null

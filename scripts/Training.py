@@ -154,7 +154,32 @@ def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
     return best_losses, best_ious
 
 
-def _train(dataset, run=None, config=None):
+def log_results(config, best_losses, best_ious):
+    # Print all training and validation metrics
+    avg_iou = mean(best_ious)
+    avg_iou_std = stdev(best_ious)
+
+    avg_loss = mean(best_losses)
+    avg_loss_std = stdev(best_losses)
+
+    print(f"Average validation iou of all folds:\t{avg_iou:.4f} +/- {avg_iou_std:.4f}")
+    print(
+        f"Average validation loss of all folds:\t{avg_loss:.4f} +/- {avg_loss_std:.4f}\n\n"
+    )
+
+    # Log the metrics if using wandb
+    if config.log:
+        avg_metrics = {}
+
+        avg_metrics["avg_iou"] = avg_iou
+        avg_metrics["avg_iou_std"] = avg_iou_std
+        avg_metrics["avg_loss"] = avg_loss
+        avg_metrics["avg_loss_std"] = avg_loss_std
+
+        wandb.log({"avg_metrics": avg_metrics})
+
+
+def kfold_train(dataset, run=None, config=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model_name = config.model_name
 
@@ -167,6 +192,7 @@ def _train(dataset, run=None, config=None):
                 run=run,
                 device=device,
             )
+            log_results(config, best_losses, best_ious)
     else:
         best_losses, best_ious = _kfold_train(
             model_name=model_name,
@@ -174,38 +200,13 @@ def _train(dataset, run=None, config=None):
             dataset=dataset,
             device=device,
         )
-
-    # Print all training and validation metrics
-    if config.checkpoint:
-        avg_iou = mean(best_ious)
-        avg_iou_std = stdev(best_ious)
-
-        avg_loss = mean(best_losses)
-        avg_loss_std = stdev(best_losses)
-
-        print(
-            f"Average validation iou of all folds:\t{avg_iou:.4f} +/- {avg_iou_std:.4f}"
-        )
-        print(
-            f"Average validation loss of all folds:\t{avg_loss:.4f} +/- {avg_loss_std:.4f}\n\n"
-        )
-
-        # Log the metrics if using wanb
-        if config.log:
-            avg_metrics = {}
-
-            avg_metrics["avg_iou"] = avg_iou
-            avg_metrics["avg_iou_std"] = avg_iou_std
-            avg_metrics["avg_loss"] = avg_loss
-            avg_metrics["avg_loss_std"] = avg_loss_std
-
-            wandb.log({"avg_metrics": avg_metrics})
+        log_results(config, best_losses, best_ious)
 
 
 def sweep_train(config=None):
     config, run = wandb_setup(config)
     dataset = create_dataset(config=config)
-    _train(dataset, run=run, config=config)
+    kfold_train(dataset, run=run, config=config)
 
 
 def train(defaults_path=""):
@@ -223,14 +224,6 @@ def train(defaults_path=""):
         setup_env(cfg.mode)
     print("Loading configuration complete.\n")
 
-    # conf = dotenv_values("config/develop.env")
-
-    # conf = (
-    #     dotenv_values("config/develop.env")
-    #     if config.mode == "develop"
-    #     else dotenv_values("config/train.env")
-    # )
-
     if cfg.sweep:
         sweep_cfg = cfg.sweep_cfg
         sweep_id = wandb.sweep(sweep_cfg, project="Sartorius-Kaggle-Competition")
@@ -241,10 +234,10 @@ def train(defaults_path=""):
         if cfg.log:
             config, run = wandb_setup(cfg)
             ds_train = create_dataset(config=cfg)
-            _train(config=config, run=run, dataset=ds_train)
+            kfold_train(config=config, run=run, dataset=ds_train)
         else:
             ds_train = create_dataset(config=cfg)
-            _train(config=cfg, dataset=ds_train)
+            kfold_train(config=cfg, dataset=ds_train)
 
     end = datetime.now()
     delta = end - start

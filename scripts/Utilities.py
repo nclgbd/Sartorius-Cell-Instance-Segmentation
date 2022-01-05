@@ -303,7 +303,7 @@ def wandb_log_masks(
         images, masks = next(iter_)
         images, masks = images.to(device), masks.to(device)
         pred_masks = model(images)
-        pred_masks = nn.functional.softmax(pred_masks, dim=1)
+        # pred_masks = nn.functional.softmax(pred_masks, dim=1)
 
         for image, mask, pred_mask in tqdm(
             list(zip(images, masks, pred_masks)), desc="Uploading masks"
@@ -313,6 +313,7 @@ def wandb_log_masks(
             image = Image.fromarray(image).convert("RGB")
             mask = mask.squeeze(0).cpu().numpy()
             pred_mask = pred_mask.squeeze(0).cpu().numpy()
+            pred_mask = (pred_mask > 0.5).astype(np.int32)
             mask_imgs.append(wandb_mask(image, mask, pred_mask))
 
         wandb.log({fold_name: mask_imgs})
@@ -356,6 +357,7 @@ class CellDataset(Dataset):
                 GaussNoise(mean=config.mean),
                 ShiftScaleRotate(),
                 ToTensorV2(),
+                RandomBrightnessContrast(),
             ]
         )
 

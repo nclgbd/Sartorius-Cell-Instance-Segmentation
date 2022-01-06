@@ -4,9 +4,9 @@ metrics:
     eps: 1
     threshold: 0.5
 loss:
-  mixed_loss:
-    alpha: 10
-    gamma: 2.0
+  dice_loss:
+    eps: 1
+    beta: 1
 optimizer:
   adam:
     eps: 1

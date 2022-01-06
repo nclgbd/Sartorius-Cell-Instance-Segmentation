@@ -99,7 +99,6 @@ def _train_epoch(
 def _kfold_train(
     model_name, config, idx, train_idx, valid_idx, dataset, run=None, device="cuda"
 ):
-
     fold_idx = idx + 1
     early_stopping = _init_train(model_name, config=config, run=run)
     model, kwargs = configure_params(config=config)
@@ -183,7 +182,7 @@ def kfold_train(dataset, cfg=None):
 
     for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
         if cfg.log:
-            config, run = wandb_setup(cfg)
+            config, run = wandb_setup(idx + 1, cfg)
             with run:
                 best_loss, best_iou = _kfold_train(
                     model_name=model_name,
@@ -214,14 +213,14 @@ def kfold_train(dataset, cfg=None):
         best_ious.append(best_iou)
 
     if cfg.log:
-        config, _ = wandb_setup(cfg)
+        config, _ = wandb_setup(idx + 1, cfg)
         log_results(config, best_losses, best_ious)
 
 
 def sweep_train(config=None):
-    config, run = wandb_setup(config)
+    # config, run = wandb_setup(idx + 1, config)
     dataset = create_dataset(config=config)
-    kfold_train(dataset, run=run, config=config)
+    kfold_train(dataset, config=config)
 
 
 def train(defaults_path=""):

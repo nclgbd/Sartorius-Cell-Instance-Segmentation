@@ -62,13 +62,13 @@ def setup_env(mode, group_id=None):
     return run_group
 
 
-def wandb_setup(config=None):
+def wandb_setup(fold_idx, config=None):
     reset_wandb_env()
 
-    run_id = wandb.util.generate_id()
+    run_id = "".join([config.run_group, str(fold_idx)])
     os.environ["WANDB_RUN_ID"] = run_id
 
-    run_name = "".join(["unet", f"-{run_id}"])
+    run_name = "".join(["unet", f"-{config.run_group}", f"_{fold_idx}"])
     run = wandb.init(
         project="Sartorius-Kaggle-Competition",
         entity="nclgbd",
@@ -508,7 +508,7 @@ class EarlyStopping:
         self.run = run
         self.config = config
         self.id = run.id if run else ""
-        self.run_name = f"{self.model_name}-{self.id}" if run else self.model_name
+        self.run_name = run.name if run else self.model_name
         self.fname = (
             "".join([self.run_name, ".pth"]) if run else self.model_name + ".pth"
         )

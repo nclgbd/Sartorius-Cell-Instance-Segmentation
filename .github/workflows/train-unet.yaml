@@ -3,7 +3,7 @@ name: Train unet
 on:
   push:
     branches:
-      - train-unet
+      - train-unet*
 
 jobs:
   train-unet:

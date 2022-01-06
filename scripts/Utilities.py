@@ -9,8 +9,15 @@ import wandb
 import torch
 import segmentation_models_pytorch as smp
 
+from torchvision import transforms
+from dotenv import dotenv_values
 from pprint import pprint
-from torch import nn
+from PIL import Image
+from torch import nn, optim
+from segmentation_models_pytorch.utils import losses
+from segmentation_models_pytorch.utils.metrics import IoU
+
+from Losses import MixedLoss
 
 from albumentations import (
     HorizontalFlip,
@@ -20,15 +27,94 @@ from albumentations import (
     Resize,
     Compose,
     GaussNoise,
+    RGBShift,
+    RandomBrightnessContrast,
 )
 from albumentations.pytorch import ToTensorV2
-from torch.utils.data import Dataset, Subset, DataLoader
+from torch.utils.data import Dataset, DataLoader
 from tqdm import tqdm
 from sklearn.model_selection import StratifiedKFold, train_test_split
 
 
 CLASS_MAPPING = {0: "shsy5y", 1: "cort", 2: "astro"}
 CLASS_MAPPING_ID = {v: k for k, v in CLASS_MAPPING.items()}
+
+
+## WANDB
+def setup_env(mode, group_id=None):
+    conf = (
+        dotenv_values("config/develop.env")
+        if mode == "develop"
+        else dotenv_values("config/train.env")
+    )
+
+    os.environ["WANDB_API_KEY"] = conf["wandb_api_key"]
+    os.environ["WANDB_ENTITY"] = conf["wandb_entity"]
+    os.environ["WANDB_RESUME"] = conf["wandb_resume"]
+    os.environ["WANDB_MODE"] = conf["wandb_mode"]
+    os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
+    os.environ["WANDB_TAGS"] = conf["wandb_tags"]
+
+    run_group = "".join([conf["wandb_job_type"], f"-{group_id}"])
+    if group_id:
+        os.environ["WANDB_RUN_GROUP"] = run_group
+
+    return run_group
+
+
+def wandb_setup(fold_idx, config=None):
+    reset_wandb_env()
+
+    run_id = "".join([config.run_group, str(fold_idx)])
+    os.environ["WANDB_RUN_ID"] = run_id
+
+    run_name = "".join(["unet", f"-{config.run_group}", f"_{fold_idx}"])
+    run = wandb.init(
+        project="Sartorius-Kaggle-Competition",
+        entity="nclgbd",
+        config=config,
+        reinit=True,
+        name=run_name,
+        id=run_id,
+        group=config.run_group,
+    )
+
+    return wandb.config, run
+
+
+def reset_wandb_env():
+    exclude = {
+        "WANDB_PROJECT",
+        "WANDB_ENTITY",
+        "WANDB_API_KEY",
+    }
+    for k, _ in os.environ.items():
+        if k.startswith("WANDB_") and k not in exclude:
+            del os.environ[k]
+
+
+# CREATING MODELS AND FEATURES
+def create_optimizer(optimizer, model_params, **kwargs):
+    if optimizer == "adam":
+        return optim.Adam(params=model_params, **kwargs)
+    else:
+        raise ValueError(f"No corresponding `{optimizer}` type")
+
+
+def create_criterion(loss, **kwargs):
+    if loss == "mixed_loss":
+        return MixedLoss(**kwargs)
+    elif loss == "dice_loss":
+        return losses.DiceLoss(**kwargs)
+    else:
+        raise ValueError(f"No corresponding `{loss}` type")
+
+
+def create_metrics(metrics, **kwargs):
+    if metrics == "iou":
+        return IoU(**kwargs)
+    else:
+        raise ValueError(f"No corresponding `{metrics}` type")
 
 
 def make_model(config=None, cuda=True):
@@ -40,23 +126,39 @@ def make_model(config=None, cuda=True):
     elif model_name == "unetplusplus":
         kwargs = config.unetplusplus
         model = smp.UnetPlusPlus(**kwargs)
+    else:
+        raise ValueError(f"`{model_name}` model not recognized")
 
     if cuda:
         model.cuda()
     return model
 
 
-def create_loader(dataset: Dataset, idx, config=None, shuffle=False):
+def create_loader(dataset: Dataset, idx, batch_size, shuffle=True):
     ds = torch.utils.data.Subset(dataset, idx)
     loader = DataLoader(
         ds,
-        batch_size=config["batch_size"],
+        batch_size=batch_size,
         shuffle=shuffle,
     )
 
     return loader
 
 
+def create_dataset(config=None):
+    print("\nLoading training data...")
+    df_train = pd.read_csv("data/train.csv")
+    print("Loading training data complete.\n")
+    print(df_train.info())
+
+    print("\nConfiguring data...")
+    ds_train = CellDataset(df_train, config=config)
+    print("Configuring data complete.\n")
+
+    return ds_train
+
+
+# VISUALIZATIONS
 def display_dataset(img_paths, rows=2, cols=10):
     """
     Function to Display Images from Dataset.
@@ -96,7 +198,7 @@ def im_convert(tensor, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
         Returns ndarry de-normalizazed representation of an image.
     """
 
-    image = tensor.clone().detach().numpy()
+    image = tensor.clone().squeeze(0).cpu().numpy()
     image = image.transpose(1, 2, 0)
     image = image * np.array(std) + np.array(mean)  # [0, 1] -> [0, 255]
     image = image.clip(0, 1)
@@ -188,13 +290,44 @@ def plot_masks(image_id, df_train, config=None, colors=True):
 
 
 # Note the use of wandb.Image
-def wandb_mask(bg_img, gt_mask):
+def wandb_mask(bg_img, gt_mask, pred_mask):
     return wandb.Image(
         bg_img,
-        masks={"ground_truth": {"mask_data": gt_mask, "class_labels": CLASS_MAPPING}},
+        masks={
+            "ground_truth": {"mask_data": gt_mask, "class_labels": CLASS_MAPPING},
+            "prediction": {"mask_data": pred_mask, "class_labels": CLASS_MAPPING},
+        },
     )
 
 
+def wandb_log_masks(
+    model: nn.Module, loader: DataLoader, fold_name: str, device="cuda"
+):
+    model = model.eval()
+    mask_imgs = []
+    with torch.no_grad():
+        # only log a batch size of images, for memory reasons
+        iter_ = iter(loader)
+        images, masks = next(iter_)
+        images, masks = images.to(device), masks.to(device)
+        pred_masks = model(images)
+        pred_masks = torch.sigmoid(pred_masks)
+
+        for image, mask, pred_mask in tqdm(
+            list(zip(images, masks, pred_masks)), desc="Uploading masks"
+        ):
+            image = im_convert(image)  # .squeeze(0).cpu().numpy().transpose(1, 2, 0)
+            image = np.uint8(image * 255)
+            image = Image.fromarray(image).convert("RGB")
+            mask = mask.squeeze(0).cpu().numpy()
+            pred_mask = pred_mask.squeeze(0).cpu().numpy()
+            pred_mask = (pred_mask > 0.5).astype(np.int32)
+            mask_imgs.append(wandb_mask(image, mask, pred_mask))
+
+        wandb.log({fold_name: mask_imgs})
+
+
+# CLASSES
 class CellDataset(Dataset):
     def __init__(self, df: pd.DataFrame, config=None):
         """
@@ -226,8 +359,20 @@ class CellDataset(Dataset):
             [
                 Resize(config.image_resize[0], config.image_resize[1]),
                 Normalize(mean=config.mean, std=config.std, p=1),
+                # RGBShift(r_shift_limit=15, g_shift_limit=15, b_shift_limit=15, p=0.5),
                 HorizontalFlip(p=0.5),
                 VerticalFlip(p=0.5),
+                GaussNoise(mean=config.mean),
+                ShiftScaleRotate(),
+                ToTensorV2(),
+                RandomBrightnessContrast(),
+            ]
+        )
+
+        self.test_transforms = Compose(
+            [
+                Resize(config.image_resize[0], config.image_resize[1]),
+                Normalize(mean=config.mean, std=config.std, p=1),
                 ToTensorV2(),
             ]
         )
@@ -239,16 +384,21 @@ class CellDataset(Dataset):
         self.dl_train: DataLoader
         self.dl_valid: DataLoader
 
+        self.train = True
+
     def __getitem__(self, idx):
         image_id = self.image_ids[idx]
         df = self.gb.get_group(image_id)
         annotations = df["annotation"].tolist()
         img_path = os.path.join(self.train_path, image_id + ".png")
-        # img_path = df["img_path"].loc[image_id]
         image = cv2.imread(img_path)
         mask = build_masks(self.df, image_id, input_shape=(520, 704))
         mask = (mask >= 1).astype("float32")
-        augmented = self.transforms(image=image, mask=mask)
+        augmented = (
+            self.transforms(image=image, mask=mask)
+            if self.train
+            else self.test_transforms(image=image, mask=mask)
+        )
         image = augmented["image"]
         mask = augmented["mask"]
         return image, mask.reshape(
@@ -287,6 +437,9 @@ class CellDataset(Dataset):
                     X, y.argmax(1), test_size=test_size, random_state=self.config.seed
                 )
             )
+
+    def set_train(self, train=True):
+        self.train = train
 
 
 class EarlyStopping:
@@ -354,11 +507,10 @@ class EarlyStopping:
         self.artifact: wandb.Artifact
         self.run = run
         self.config = config
-        self.id = run.id if run else config.github_sha[:5]
+        self.id = run.id if run else ""
+        self.run_name = run.name if run else self.model_name
         self.fname = (
-            "".join([self.model_name, f"-{self.id}", ".pth"])
-            if run
-            else self.model_name + ".pth"
+            "".join([self.run_name, ".pth"]) if run else self.model_name + ".pth"
         )
 
         self.path = str(os.path.join(model_dir, self.fname))
@@ -399,22 +551,20 @@ class EarlyStopping:
                 "loss": self.min_loss,
                 "iou": self.max_iou,
             }
-            if self.config.log:
-                wandb.log(self.state_dict)
-
-            if self.config.checkpoint:
-                torch.save(self.state_dict, self.path)
-
-                if self.config.log:
-                    self.artifact = wandb.Artifact("unet", type="model")
-                    self.artifact.add_file(self.path)
-                    self.run.log_artifact(self.artifact)
 
         else:
             self.count += 1
 
-        return self.check_patience()
+        return self._check_patience()
 
-    def check_patience(self) -> (bool):
+    def _check_patience(self) -> (bool):
         print(f"Patience: {self.count}/{self.patience}")
         return self.count >= self.patience
+
+    def save_model(self):
+        if self.config.checkpoint:
+            torch.save(self.state_dict, self.path)
+            if self.config.log:
+                self.artifact = wandb.Artifact(self.run_name, type="model")
+                self.artifact.add_file(self.path)
+                self.run.log_artifact(self.artifact)

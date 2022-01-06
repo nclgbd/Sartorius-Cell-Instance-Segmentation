@@ -41,7 +41,7 @@ CLASS_MAPPING_ID = {v: k for k, v in CLASS_MAPPING.items()}
 
 
 ## WANDB
-def setup_env(mode):
+def setup_env(mode, group_id=None):
     conf = (
         dotenv_values("config/develop.env")
         if mode == "develop"
@@ -55,20 +55,28 @@ def setup_env(mode):
     os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
     os.environ["WANDB_TAGS"] = conf["wandb_tags"]
 
+    run_group = "".join([conf["wandb_job_type"], f"-{group_id}"])
+    if group_id:
+        os.environ["WANDB_RUN_GROUP"] = run_group
 
-def wandb_setup(config=None):
+    return run_group
+
+
+def wandb_setup(fold_idx, config=None):
     reset_wandb_env()
 
-    run_id = wandb.util.generate_id()
+    run_id = "".join([config.run_group, str(fold_idx)])
     os.environ["WANDB_RUN_ID"] = run_id
 
-    run_name = "".join(["unet", f"-{run_id}"])
+    run_name = "".join(["unet", f"-{config.run_group}", f"_{fold_idx}"])
     run = wandb.init(
         project="Sartorius-Kaggle-Competition",
         entity="nclgbd",
         config=config,
         reinit=True,
         name=run_name,
+        id=run_id,
+        group=config.run_group,
     )
 
     return wandb.config, run
@@ -303,7 +311,7 @@ def wandb_log_masks(
         images, masks = next(iter_)
         images, masks = images.to(device), masks.to(device)
         pred_masks = model(images)
-        # pred_masks = nn.functional.softmax(pred_masks, dim=1)
+        pred_masks = torch.sigmoid(pred_masks)
 
         for image, mask, pred_mask in tqdm(
             list(zip(images, masks, pred_masks)), desc="Uploading masks"
@@ -500,7 +508,7 @@ class EarlyStopping:
         self.run = run
         self.config = config
         self.id = run.id if run else ""
-        self.run_name = f"{self.model_name}-{self.id}" if run else self.model_name
+        self.run_name = run.name if run else self.model_name
         self.fname = (
             "".join([self.run_name, ".pth"]) if run else self.model_name + ".pth"
         )

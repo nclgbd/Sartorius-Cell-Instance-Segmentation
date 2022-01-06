@@ -26,7 +26,7 @@ mean: [0.485, 0.456, 0.406]
 std: [0.229, 0.224, 0.225]
 image_resize: [224, 224]
 batch_size: 16
-epochs: 1
+epochs: 3
 
 # Models
 unet:
@@ -36,7 +36,7 @@ unet:
   decoder_channels: [256, 128, 64, 32, 16]
   in_channels: 3
   classes: 1
-  activation: "sigmoid"
+  activation: null
   aux_params: null
 
 unetplusplus:
@@ -48,5 +48,5 @@ unetplusplus:
   decoder_attention_type: None
   in_channels: 3
   classes: 1
-  activation: "sigmoid"
+  activation: null
   aux_params: null

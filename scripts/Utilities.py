@@ -41,7 +41,7 @@ CLASS_MAPPING_ID = {v: k for k, v in CLASS_MAPPING.items()}
 
 
 ## WANDB
-def setup_env(mode):
+def setup_env(mode, group_id=None):
     conf = (
         dotenv_values("config/develop.env")
         if mode == "develop"
@@ -54,6 +54,12 @@ def setup_env(mode):
     os.environ["WANDB_MODE"] = conf["wandb_mode"]
     os.environ["WANDB_JOB_TYPE"] = conf["wandb_job_type"]
     os.environ["WANDB_TAGS"] = conf["wandb_tags"]
+
+    run_group = "".join([conf["wandb_job_type"], f"-{group_id}"])
+    if group_id:
+        os.environ["WANDB_RUN_GROUP"] = run_group
+
+    return run_group
 
 
 def wandb_setup(config=None):
@@ -69,6 +75,8 @@ def wandb_setup(config=None):
         config=config,
         reinit=True,
         name=run_name,
+        id=run_id,
+        group=config.run_group,
     )
 
     return wandb.config, run

@@ -131,6 +131,7 @@ class Config:
             pprint(self.sweep_cfg)
 
         self.set_seed()
+        self.run_group = ""
         print("")
 
     def set_seed(self):
@@ -147,3 +148,6 @@ class Config:
         torch.cuda.manual_seed_all(self.seed)
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
+
+    def set_run_group(self, run_group):
+        self.run_group = run_group

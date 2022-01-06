@@ -96,62 +96,65 @@ def _train_epoch(
     return valid_epoch_loss, valid_epoch_iou
 
 
-def _kfold_train(model_name, config, dataset, run=None, device="cuda"):
-    best_losses = []
-    best_ious = []
+def _kfold_train(
+    model_name, config, idx, train_idx, valid_idx, dataset, run=None, device="cuda"
+):
+    # best_losses = []
+    # best_ious = []
 
-    for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
-        fold_idx = idx + 1
-        early_stopping = _init_train(model_name, config=config, run=run)
-        model, kwargs = configure_params(config=config)
+    fold_idx = idx + 1
+    early_stopping = _init_train(model_name, config=config, run=run)
+    model, kwargs = configure_params(config=config)
 
-        criterion = kwargs["criterion"]
-        optimizer = kwargs["optimizer"]
-        metrics = [kwargs["metrics"]]
-        lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer=optimizer, mode="min", verbose=True, patience=3
+    criterion = kwargs["criterion"]
+    optimizer = kwargs["optimizer"]
+    metrics = [kwargs["metrics"]]
+    lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer=optimizer, mode="min", verbose=True, patience=3
+    )
+
+    if config.log:
+        wandb.watch(model, log_graph=True)
+
+    # Create loaders
+    print(f"\nFold: {fold_idx}\n-------")
+    dataset.set_train(True)
+    dl_train = create_loader(dataset, train_idx, batch_size=config.batch_size)
+    dataset.set_train(False)
+    dl_valid = create_loader(dataset, valid_idx, batch_size=config.batch_size)
+
+    for epoch in range(1, config.epochs + 1):
+        print(f"Epoch {epoch}\n")
+        loss, iou = _train_epoch(
+            config,
+            model,
+            dl_train,
+            dl_valid,
+            optimizer,
+            criterion,
+            metrics,
+            lr_scheduler,
+            device,
         )
 
-        if config.log:
-            wandb.watch(model, log_graph=True)
+        if early_stopping.checkpoint(
+            model, epoch=epoch, loss=loss, iou=iou, optimizer=optimizer
+        ):
+            early_stopping.save_model()
+            break
 
-        # Create loaders
-        print(f"\nFold: {fold_idx}\n-------")
-        dataset.set_train(True)
-        dl_train = create_loader(dataset, train_idx, batch_size=config.batch_size)
-        dataset.set_train(False)
-        dl_valid = create_loader(dataset, valid_idx, batch_size=config.batch_size)
+    if config.log:
+        fold_name = early_stopping.run_name + f"_{fold_idx}"
+        wandb_log_masks(
+            fold_name=fold_name, model=model, loader=dl_valid, device=device
+        )
 
-        for epoch in range(1, config.epochs + 1):
-            print(f"Epoch {epoch}\n")
-            loss, iou = _train_epoch(
-                config,
-                model,
-                dl_train,
-                dl_valid,
-                optimizer,
-                criterion,
-                metrics,
-                lr_scheduler,
-                device,
-            )
+    return early_stopping.min_loss, early_stopping.max_iou
+    # best_losses.append(early_stopping.min_loss)
+    # best_ious.append(early_stopping.max_iou)
 
-            if early_stopping.checkpoint(
-                model, epoch=epoch, loss=loss, iou=iou, optimizer=optimizer
-            ):
-                early_stopping.save_model()
-                break
 
-        if config.log:
-            fold_name = early_stopping.run_name + f"_{fold_idx}"
-            wandb_log_masks(
-                fold_name=fold_name, model=model, loader=dl_valid, device=device
-            )
-
-        best_losses.append(early_stopping.min_loss)
-        best_ious.append(early_stopping.max_iou)
-
-    return best_losses, best_ious
+# return best_losses, best_ious
 
 
 def log_results(config, best_losses, best_ious):
@@ -179,27 +182,46 @@ def log_results(config, best_losses, best_ious):
         wandb.log({"avg_metrics": avg_metrics})
 
 
-def kfold_train(dataset, run=None, config=None):
+def kfold_train(dataset, cfg=None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_name = config.model_name
+    model_name = cfg.model_name
+    best_losses = []
+    best_ious = []
 
-    if config.log:
-        with run:
-            best_losses, best_ious = _kfold_train(
+    for idx, (train_idx, valid_idx) in enumerate(dataset.folds):
+        if cfg.log:
+            config, run = wandb_setup(cfg)
+            with run:
+                best_loss, best_iou = _kfold_train(
+                    model_name=model_name,
+                    config=config,
+                    idx=idx,
+                    train_idx=train_idx,
+                    valid_idx=valid_idx,
+                    dataset=dataset,
+                    run=run,
+                    device=device,
+                )
+                print(f"Best loss: {best_loss:.4f}\t Best iou: {best_iou:.4f}")
+                wandb.log({"best_loss": best_loss})
+                wandb.log({"best_iou": best_iou})
+        else:
+            best_loss, best_iou = _kfold_train(
                 model_name=model_name,
-                config=config,
+                config=cfg,
+                idx=idx,
+                train_idx=train_idx,
+                valid_idx=valid_idx,
                 dataset=dataset,
-                run=run,
                 device=device,
             )
-            log_results(config, best_losses, best_ious)
-    else:
-        best_losses, best_ious = _kfold_train(
-            model_name=model_name,
-            config=config,
-            dataset=dataset,
-            device=device,
-        )
+            print(f"Best loss: {best_loss:.4f}\t Best iou: {best_iou:.4f}")
+            
+        best_losses.append(best_loss)
+        best_ious.append(best_iou)
+        
+    if cfg.log:
+        config, _ = wandb_setup(cfg)
         log_results(config, best_losses, best_ious)
 
 
@@ -221,7 +243,11 @@ def train(defaults_path=""):
     )
 
     if cfg.log:
-        setup_env(cfg.mode)
+        group_id = wandb.util.generate_id()
+        run_group = setup_env(cfg.mode, group_id)
+        cfg.set_run_group(run_group)
+        print(f"Group ID: {group_id}")
+        
     print("Loading configuration complete.\n")
 
     if cfg.sweep:
@@ -231,13 +257,8 @@ def train(defaults_path=""):
         wandb.agent(sweep_id, sweep_train, count=cfg.count)
 
     else:
-        if cfg.log:
-            config, run = wandb_setup(cfg)
-            ds_train = create_dataset(config=cfg)
-            kfold_train(config=config, run=run, dataset=ds_train)
-        else:
-            ds_train = create_dataset(config=cfg)
-            kfold_train(config=cfg, dataset=ds_train)
+        ds_train = create_dataset(config=cfg)
+        kfold_train(cfg=cfg, dataset=ds_train)
 
     end = datetime.now()
     delta = end - start

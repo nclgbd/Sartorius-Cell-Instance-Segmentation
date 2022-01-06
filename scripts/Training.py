@@ -141,10 +141,8 @@ def _kfold_train(
             break
 
     if config.log:
-        fold_name = early_stopping.run_name + f"_{fold_idx}"
-        wandb_log_masks(
-            fold_name=fold_name, model=model, loader=dl_valid, device=device
-        )
+        # fold_name = early_stopping.run_name + f"_{fold_idx}"
+        wandb_log_masks(fold_name=run.name, model=model, loader=dl_valid, device=device)
 
     return early_stopping.min_loss, early_stopping.max_iou
 

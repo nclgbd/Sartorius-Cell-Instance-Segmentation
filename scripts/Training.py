@@ -99,8 +99,6 @@ def _train_epoch(
 def _kfold_train(
     model_name, config, idx, train_idx, valid_idx, dataset, run=None, device="cuda"
 ):
-    # best_losses = []
-    # best_ious = []
 
     fold_idx = idx + 1
     early_stopping = _init_train(model_name, config=config, run=run)
@@ -114,7 +112,7 @@ def _kfold_train(
     )
 
     if config.log:
-        wandb.watch(model, log_graph=True)
+        wandb.watch(model, criterion=criterion, idx=idx, log="all", log_graph=True)
 
     # Create loaders
     print(f"\nFold: {fold_idx}\n-------")
@@ -150,11 +148,6 @@ def _kfold_train(
         )
 
     return early_stopping.min_loss, early_stopping.max_iou
-    # best_losses.append(early_stopping.min_loss)
-    # best_ious.append(early_stopping.max_iou)
-
-
-# return best_losses, best_ious
 
 
 def log_results(config, best_losses, best_ious):
@@ -216,10 +209,10 @@ def kfold_train(dataset, cfg=None):
                 device=device,
             )
             print(f"Best loss: {best_loss:.4f}\t Best iou: {best_iou:.4f}")
-            
+
         best_losses.append(best_loss)
         best_ious.append(best_iou)
-        
+
     if cfg.log:
         config, _ = wandb_setup(cfg)
         log_results(config, best_losses, best_ious)
@@ -247,7 +240,7 @@ def train(defaults_path=""):
         run_group = setup_env(cfg.mode, group_id)
         cfg.set_run_group(run_group)
         print(f"Group ID: {group_id}")
-        
+
     print("Loading configuration complete.\n")
 
     if cfg.sweep:

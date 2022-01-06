@@ -5,7 +5,7 @@ metrics:
     threshold: 0.5
 loss:
   dice_loss:
-    eps: 1
+    eps: 0.0000001
     beta: 1
 optimizer:
   adam:

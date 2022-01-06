@@ -147,7 +147,7 @@ def _kfold_train(
     return early_stopping.min_loss, early_stopping.max_iou
 
 
-def log_results(config, best_losses, best_ious):
+def log_results(best_losses, best_ious):
     # Print all training and validation metrics
     avg_iou = mean(best_ious)
     avg_iou_std = stdev(best_ious)
@@ -159,17 +159,6 @@ def log_results(config, best_losses, best_ious):
     print(
         f"Average validation loss of all folds:\t{avg_loss:.4f} +/- {avg_loss_std:.4f}\n\n"
     )
-
-    # Log the metrics if using wandb
-    if config.log:
-        avg_metrics = {}
-
-        avg_metrics["avg_iou"] = avg_iou
-        avg_metrics["avg_iou_std"] = avg_iou_std
-        avg_metrics["avg_loss"] = avg_loss
-        avg_metrics["avg_loss_std"] = avg_loss_std
-
-        wandb.log({"avg_metrics": avg_metrics})
 
 
 def kfold_train(dataset, cfg=None):
@@ -210,9 +199,7 @@ def kfold_train(dataset, cfg=None):
         best_losses.append(best_loss)
         best_ious.append(best_iou)
 
-    if cfg.log:
-        config, _ = wandb_setup(idx + 1, cfg)
-        log_results(config, best_losses, best_ious)
+    log_results(best_losses, best_ious)
 
 
 def sweep_train(config=None):

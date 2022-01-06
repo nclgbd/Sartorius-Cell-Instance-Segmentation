@@ -448,7 +448,7 @@ class EarlyStopping:
         model_dir: str,
         model_name: str,
         min_delta=0,
-        patience=5,
+        patience=10,
         config=None,
         run=None,
     ):

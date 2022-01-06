@@ -10,4 +10,4 @@ loss:
 optimizer:
   adam:
     eps: 1
-    lr: 0.01
+    lr: 0.0001

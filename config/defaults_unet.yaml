@@ -27,12 +27,13 @@ std: [0.229, 0.224, 0.225]
 image_resize: [224, 224]
 batch_size: 32
 epochs: 1000
+patience: 10
 
 # Models
 unet:
-  encoder_name: "efficientnet-b4"
+  encoder_name: "timm-efficientnet-b4"
   encoder_depth: 5
-  encoder_weights: "imagenet"
+  encoder_weights: "advprop"
   decoder_channels: [256, 128, 64, 32, 16]
   in_channels: 3
   classes: 1

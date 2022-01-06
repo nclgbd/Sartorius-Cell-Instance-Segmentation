@@ -97,6 +97,11 @@ class Config:
             self.std = self.defaults_cfg["std"]
             self.image_resize = self.defaults_cfg["image_resize"]
             self.batch_size = self.defaults_cfg["batch_size"]
+            self.patience = (
+                self.defaults_cfg["patience"]
+                if "patience" in self.defaults_cfg.keys()
+                else None
+            )
 
             # Models
             self.unet = self.defaults_cfg["unet"]
@@ -152,6 +157,6 @@ class Config:
 
     def set_run_group(self, run_group):
         self.run_group = run_group
-        
+
     def set_fold_name(self, fold_name):
         self.fold_name = fold_name

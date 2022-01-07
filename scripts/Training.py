@@ -83,8 +83,7 @@ def _train_epoch(
     valid_epoch_iou = valid_logs["iou_score"]
 
     if config.log:
-        wandb.log({"train_logs": train_logs})
-        wandb.log({"valid_logs": valid_logs})
+        wandb.log({"train_logs": train_logs, "valid_logs": valid_logs})
 
     # Print epoch results
     print(f"\nTrain loss: {train_epoch_loss:.4f}\t Train iou: {train_epoch_iou:.4f}")
@@ -108,7 +107,10 @@ def _kfold_train(
     optimizer = kwargs["optimizer"]
     metrics = [kwargs["metrics"]]
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer=optimizer, mode="min", verbose=True, patience=math.ceil(config.patience / 2.0)
+        optimizer=optimizer,
+        mode="min",
+        verbose=True,
+        patience=math.ceil(config.patience / 2.0),
     )
 
     if config.log:

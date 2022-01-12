@@ -500,7 +500,7 @@ class EarlyStopping:
         self.max_iou = -float("inf")
         self.min_delta = min_delta
         self.model_name = model_name
-        self.patience = patience
+        self.patience = config.patience if config.patience else patience
         self.count = 0
         self.first_run = True
         self.best_model = None

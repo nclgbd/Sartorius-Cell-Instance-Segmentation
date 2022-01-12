@@ -14,7 +14,9 @@ jobs:
       - uses: actions/checkout@v2
       - name: Check conda environment
         shell: bash -l {0}
-        run: bash workflow_scripts/check-conda-env.bash
+        run: |
+          conda activate skc_env 
+          bash workflow_scripts/check-conda-env.bash
       - name: Copying dataset
         shell: bash -l {0}
         run: bash workflow_scripts/copy-dataset.bash
@@ -32,7 +34,9 @@ jobs:
       - uses: actions/checkout@v2
       - name: Check conda environment
         shell: bash -l {0}
-        run: bash workflow_scripts/check-conda-env.bash
+        run: |
+          conda activate skc_env 
+          bash workflow_scripts/check-conda-env.bash
       - name: Wandb setup
         shell: bash -l {0}
         run: bash workflow_scripts/wandb-setup.bash develop-train-lab ${{ secrets.WANDB_API_KEY }} config/develop.env

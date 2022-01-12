@@ -3,7 +3,7 @@ name: Train unet
 on:
   push:
     branches:
-      - train-unet
+      - train-unet*
 
 jobs:
   train-unet:
@@ -16,7 +16,9 @@ jobs:
         id: extract_branch
       - name: Check conda environment
         shell: bash -l {0}
-        run: bash workflow_scripts/check-conda-env.bash
+        run: |
+          conda activate skc_env 
+          bash workflow_scripts/check-conda-env.bash
       - name: Wandb setup
         shell: bash -l {0}
         run: |

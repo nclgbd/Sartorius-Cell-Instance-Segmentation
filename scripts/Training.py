@@ -4,6 +4,7 @@ import wandb
 import segmentation_models_pytorch as smp
 import time
 import pandas as pd
+import math
 
 from datetime import datetime
 from statistics import mean, stdev
@@ -82,8 +83,7 @@ def _train_epoch(
     valid_epoch_iou = valid_logs["iou_score"]
 
     if config.log:
-        wandb.log({"train_logs": train_logs})
-        wandb.log({"valid_logs": valid_logs})
+        wandb.log({"train_logs": train_logs, "valid_logs": valid_logs})
 
     # Print epoch results
     print(f"\nTrain loss: {train_epoch_loss:.4f}\t Train iou: {train_epoch_iou:.4f}")
@@ -106,8 +106,12 @@ def _kfold_train(
     criterion = kwargs["criterion"]
     optimizer = kwargs["optimizer"]
     metrics = [kwargs["metrics"]]
+    patience = math.ceil(config.patience / 2.0) if config.patience else 3
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer=optimizer, mode="min", verbose=True, patience=3
+        optimizer=optimizer,
+        mode="min",
+        verbose=True,
+        patience=patience,
     )
 
     if config.log:
@@ -147,7 +151,7 @@ def _kfold_train(
     return early_stopping.min_loss, early_stopping.max_iou
 
 
-def log_results(config, best_losses, best_ious):
+def log_results(best_losses, best_ious):
     # Print all training and validation metrics
     avg_iou = mean(best_ious)
     avg_iou_std = stdev(best_ious)
@@ -159,17 +163,6 @@ def log_results(config, best_losses, best_ious):
     print(
         f"Average validation loss of all folds:\t{avg_loss:.4f} +/- {avg_loss_std:.4f}\n\n"
     )
-
-    # Log the metrics if using wandb
-    if config.log:
-        avg_metrics = {}
-
-        avg_metrics["avg_iou"] = avg_iou
-        avg_metrics["avg_iou_std"] = avg_iou_std
-        avg_metrics["avg_loss"] = avg_loss
-        avg_metrics["avg_loss_std"] = avg_loss_std
-
-        wandb.log({"avg_metrics": avg_metrics})
 
 
 def kfold_train(dataset, cfg=None):
@@ -210,9 +203,7 @@ def kfold_train(dataset, cfg=None):
         best_losses.append(best_loss)
         best_ious.append(best_iou)
 
-    if cfg.log:
-        config, _ = wandb_setup(idx + 1, cfg)
-        log_results(config, best_losses, best_ious)
+    log_results(best_losses, best_ious)
 
 
 def sweep_train(config=None):

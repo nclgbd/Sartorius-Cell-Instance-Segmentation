@@ -106,11 +106,12 @@ def _kfold_train(
     criterion = kwargs["criterion"]
     optimizer = kwargs["optimizer"]
     metrics = [kwargs["metrics"]]
+    patience = math.ceil(config.patience / 2.0) if config.patience else 3
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
         optimizer=optimizer,
         mode="min",
         verbose=True,
-        patience=math.ceil(config.patience / 2.0),
+        patience=patience,
     )
 
     if config.log:

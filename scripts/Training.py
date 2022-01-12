@@ -4,6 +4,7 @@ import wandb
 import segmentation_models_pytorch as smp
 import time
 import pandas as pd
+import math
 
 from datetime import datetime
 from statistics import mean, stdev
@@ -82,8 +83,7 @@ def _train_epoch(
     valid_epoch_iou = valid_logs["iou_score"]
 
     if config.log:
-        wandb.log({"train_logs": train_logs})
-        wandb.log({"valid_logs": valid_logs})
+        wandb.log({"train_logs": train_logs, "valid_logs": valid_logs})
 
     # Print epoch results
     print(f"\nTrain loss: {train_epoch_loss:.4f}\t Train iou: {train_epoch_iou:.4f}")
@@ -106,8 +106,12 @@ def _kfold_train(
     criterion = kwargs["criterion"]
     optimizer = kwargs["optimizer"]
     metrics = [kwargs["metrics"]]
+    patience = math.ceil(config.patience / 2.0) if config.patience else 3
     lr_scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer=optimizer, mode="min", verbose=True, patience=3
+        optimizer=optimizer,
+        mode="min",
+        verbose=True,
+        patience=patience,
     )
 
     if config.log:
